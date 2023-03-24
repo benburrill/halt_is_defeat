@@ -36,7 +36,7 @@ def test_lex_string():
     assert lex_string(r'"\n"') == [StringToken(b'\n')]
     assert lex_string(r'"\xff"') == [StringToken(b'\xff')]
     assert lex_string(r'"\u{ff}"') != lex_string(r'"\xff"')
-    assert lex_string(r'"\u{ff}"') == [StringToken('\xff'.encode())]
+    assert lex_string(r'"\u{ff}"') == [StringToken('\xff'.encode('utf-8'))]
 
     with raises(LexerError): lex_string(r'"')
     with raises(LexerError): lex_string('"\\')
@@ -102,6 +102,14 @@ def test_large():
             BracToken.RCURLY,
         BracToken.RCURLY
     ]
+
+def test_tokens():
+    assert lex_string('true')[0].data == True
+    assert lex_string('0')[0].data == 0
+    assert lex_string(r'"\x42"')[0].data == b'\x42'
+    assert lex_string(r"'\x42'")[0].data == 0x42
+    assert lex_string('+=')[0].operator is lex_string('+')[0]
+    assert lex_string('(')[0].pair is lex_string(')')[0]
 
 def test_hash_eq():
     test = '''
