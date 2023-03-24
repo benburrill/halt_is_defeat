@@ -5,9 +5,6 @@ from hidc.errors import LexerError
 
 from pytest import raises
 
-def test_fail():
-    assert False
-
 def lex_string(string):
     return [span.item for span in lex(SourceCode.from_string(string))]
 
@@ -88,6 +85,7 @@ def test_lex_keyword():
 
 def test_lex_symbol():
     assert lex_string('x+1') == [IdentToken('x', Flavor.NONE), OpToken.ADD, IntToken(1)]
+    assert lex_string('+=') == [IncAssignToken.IADD]
 
 def test_large():
     assert lex_string('''
