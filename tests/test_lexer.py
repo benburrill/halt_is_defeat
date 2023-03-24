@@ -23,6 +23,7 @@ def test_weird_int():
     # stuff that looks a bit like ints but aren't.  Instead it will be
     # handled by by the parser.
     assert lex_string('0_') == [IntToken(0), IdentToken('_', Flavor.NONE)]
+    assert lex_string('1__000') == [IntToken(1), IdentToken('__000', Flavor.NONE)]
     assert lex_string('0b') == [IntToken(0), IdentToken('b', Flavor.NONE)]
     assert lex_string('0b_') == [IntToken(0), IdentToken('b_', Flavor.NONE)]
     assert lex_string('0b_0') == [IntToken(0), IdentToken('b_0', Flavor.NONE)]
