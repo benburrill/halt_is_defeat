@@ -5,6 +5,9 @@ from hidc.errors import LexerError
 
 from pytest import raises
 
+def test_fail():
+    assert False
+
 def lex_string(string):
     return [span.item for span in lex(SourceCode.from_string(string))]
 
