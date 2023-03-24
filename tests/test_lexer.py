@@ -105,13 +105,14 @@ def test_large():
 
 def test_hash_eq():
     test = '''
-    "a" 97 'a' a @a !a + += break; if (true) {} void
+    "a" 97 'a' a @a !a + += break ; if ( true ) { } void
     '''
     assert set(lex_string(test)) == set(lex_string(test))
-    assert len(set(lex_string(test))) == 17
+    assert len(set(lex_string(test))) == len(test.strip().split())
 
-def test_invalid_syntax():
-    with raises(LexerError): lex_string('`')
+def test_syntax():
+    assert lex_string('// Comment!') == lex_string('') == []
+    with raises(LexerError): lex_string('#')
 
 def test_enum_sanity():
     assert OpToken.ADD != '+'
