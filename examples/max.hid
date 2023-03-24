@@ -1,0 +1,29 @@
+int @max(const int[] arr) {
+    try {
+        int max_val = arr[0];
+        for (int i = 1; i < arr.length; i += 1) {
+            if (arr[i] > max_val) {
+                max_val = arr[i];
+                preempt {
+                    // There are no larger values, so return early.
+                    return max_val;
+                }
+            }
+        }
+
+        // Reaching the end of the array without returning is defeat
+        !is_defeat();
+    } undo {
+        // First item was the max, return it
+        // Probably we'd actually need to put this outside the undo,
+        // since otherwise it would be hard for the compiler to tell if
+        // we could get to the end of the function without returning.
+        return arr[0];
+    }
+}
+
+void @is_you(const int[] arr) {
+    print("The maximum value of the array is: ");
+    println(@max(arr));
+}
+
