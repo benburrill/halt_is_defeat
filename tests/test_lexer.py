@@ -107,9 +107,12 @@ def test_tokens():
     assert lex_string('true')[0].data == True
     assert lex_string('0')[0].data == 0
     assert lex_string(r'"\x42"')[0].data == b'\x42'
+    assert lex_string(r'"a"')[0] + lex_string(r'"b"')[0] == lex_string(r'"ab"')[0]
     assert lex_string(r"'\x42'")[0].data == 0x42
     assert lex_string('+=')[0].operator is lex_string('+')[0]
     assert lex_string('(')[0].pair is lex_string(')')[0]
+    assert lex_string('@is_you')[0].base_name == 'is_you'
+    assert lex_string('@is_you')[0].name == '@is_you'
 
 def test_hash_eq():
     test = '''
