@@ -105,9 +105,10 @@ def test_large():
 
 def test_hash_eq():
     test = '''
-    "Hello" 42 'a' a @a !a + += break; if (true) {} void
+    "a" 97 'a' a @a !a + += break; if (true) {} void
     '''
     assert set(lex_string(test)) == set(lex_string(test))
+    assert len(set(lex_string(test))) == 17
 
 def test_invalid_syntax():
     with raises(LexerError): lex_string('`')
