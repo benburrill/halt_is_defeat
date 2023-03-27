@@ -37,7 +37,7 @@ def test_lex_string():
     assert lex_string(r'"\n"') == [StringToken(b'\n')]
     assert lex_string(r'"\xff"') == [StringToken(b'\xff')]
     assert lex_string(r'"\u{ff}"') != lex_string(r'"\xff"')
-    assert lex_string(r'"\u{ff}"') == [StringToken('\xff'.encode('utf-8'))]
+    assert lex_string(r'"\u{ff}"') == [StringToken(chr(0xff).encode('utf-8'))]
 
     with raises(LexerError): lex_string(r'"')
     with raises(LexerError): lex_string('"\\')
