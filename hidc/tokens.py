@@ -150,7 +150,7 @@ class BlockToken(EnumToken):
 class TypeToken(EnumToken):
     INT = 'int'
     BOOL = 'bool'
-    CHAR = 'char'
+    BYTE = 'byte'
     STRING = 'string'
     VOID = 'void'
     CONST = 'const'
