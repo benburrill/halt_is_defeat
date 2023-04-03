@@ -14,11 +14,3 @@ class LexerError(CompilerError):
 
     unhelpful = _message('Invalid syntax')
     expected = _message('Invalid syntax, expected {need}')
-    end_of_line = _message('Unexpected end of line')
-    eol_string = _message('Unterminated string literal')
-    bad_unicode = _message('Invalid unicode codepoint: {cp:X}')
-    bad_escape = _message('Invalid escape sequence: \\{seq}')
-    bad_hex_escape = _message('Truncated \\{seq} escape sequence')
-    too_many_bytes = _message('Unicode characters in character literals'
-                              ' must be a single UTF-8 byte')
-    bad_ident = _message('Invalid identifier starting with {prefix!r}')

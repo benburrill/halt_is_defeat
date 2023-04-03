@@ -1,6 +1,6 @@
 from hidc.tokens import *
 from hidc.lexer import lex
-from hidc.scanner import SourceCode
+from hidc.utils.scanner import SourceCode
 from hidc.errors import LexerError
 
 from pytest import raises
@@ -38,12 +38,14 @@ def test_lex_string():
     assert lex_string(r'"\xff"') == [StringToken(b'\xff')]
     assert lex_string(r'"\u{ff}"') != lex_string(r'"\xff"')
     assert lex_string(r'"\u{ff}"') == [StringToken(chr(0xff).encode('utf-8'))]
+    assert lex_string(r'"\u{1F4A9}"') == lex_string(r'"💩"') == [StringToken('💩'.encode('utf-8'))]
 
     with raises(LexerError): lex_string(r'"')
     with raises(LexerError): lex_string('"\\')
     with raises(LexerError): lex_string('"\n"')
     with raises(LexerError): lex_string(r'"\u"')
     with raises(LexerError): lex_string(r'"\u{ff"')
+    with raises(LexerError): lex_string(r'"\u{d800}"')
     with raises(LexerError): lex_string(r'"\u{110000}"')
     with raises(LexerError): lex_string(r'"\x"')
     with raises(LexerError): lex_string(r'"\"')

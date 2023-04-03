@@ -1,6 +1,6 @@
 import re
 from . import tokens
-from .scanner import Scanner
+from .utils.scanner import Scanner
 from .errors import *
 
 def lex(source):
@@ -38,6 +38,8 @@ byte_escape = re.compile(r'\\x([\da-fA-F]{2})')
 def read_byte_escape(scan):
     if escape := scan.match(byte_escape):
         return bytes([int(escape, 16)])
+    elif scan.exact('\\x'):
+        raise LexerError('Invalid byte escape sequence', scan.mark())
 
 
 unicode_escape = re.compile(r'\\u\{([\da-fA-F]+)\}')
@@ -47,7 +49,12 @@ def read_char_escape(scan):
         codepoint = int(escape, 16)
         try: return chr(codepoint)
         except ValueError:
-            raise LexerError.bad_unicode(scan.mark(), cp=codepoint)
+            raise LexerError(
+                f'Invalid unicode codepoint: {codepoint:X}',
+                scan.mark()
+            )
+    elif scan.exact('\\u'):
+        raise LexerError('Invalid unicode escape sequence', scan.mark())
     elif scan.exact('\\'):
         char = scan.read(1)
 
@@ -55,10 +62,7 @@ def read_char_escape(scan):
             raise LexerError.unhelpful(scan.mark())
 
         if char not in escape_codes:
-            # really we should probably raise error elsewhere
-            if char in 'ux':
-                raise LexerError.bad_hex_escape(scan.mark(), seq=char)
-            raise LexerError.bad_escape(scan.mark(), seq=char)
+            raise LexerError(f'Invalid escape sequence: \\{char}', scan.mark())
 
         return escape_codes[char]
 
@@ -68,9 +72,8 @@ def read_escape_bytes(scan, encoding):
         return escaped
     elif escaped := read_char_escape(scan):
         try: return escaped.encode(encoding)
-        except UnicodeEncodeError:
-            raise LexerError.bad_unicode(scan.mark(), cp=ord(escaped[0]))
-
+        except UnicodeEncodeError as e:
+            raise LexerError(str(e), scan.mark())
 
 def read_char_token(scan):
     if not scan.exact("'"):
@@ -83,13 +86,22 @@ def read_char_token(scan):
         if char := scan.read(1):
             byte = char.encode('utf-8')
         else:
-            raise LexerError.end_of_line(scan.mark())
+            raise LexerError('Unclosed character literal', scan.mark())
 
     if not scan.exact("'"):
         raise LexerError.expected(scan.mark(), need="'")
 
     if len(byte) != 1:
-        raise LexerError.too_many_bytes(scan.mark())
+        # I might consider instead rejecting \x sequences in character
+        # literals and ONLY allow unicode, but I can't really have both.
+        # However, since strings are actually just UTF-8 byte strings
+        # and I don't have a true character data type (only byte),
+        # there's not much sense in having unicode char literals.
+        raise LexerError(
+            'Unicode is not allowed in character literals, unless '
+            'encodable as a single UTF-8 byte',
+            scan.mark()
+        )
 
     return tokens.CharToken(byte[0])
 
@@ -108,7 +120,7 @@ def read_string_token(scan):
         elif scan.exact('"'):
             return tokens.StringToken(bytes(result))
         else:
-            raise LexerError.eol_string(scan.mark())
+            raise LexerError('Unclosed string literal', scan.mark())
 
 
 hex_literal = re.compile(r'0x(?:[\da-fA-F]_?)*[\da-fA-F]')
@@ -147,7 +159,7 @@ def read_ident_or_keyword_token(scan):
         if ident not in keyword_tokens:
             return tokens.IdentToken(ident, flavor)
 
-    raise LexerError.bad_ident(scan.mark(), prefix=str(flavor))
+    raise LexerError(f'Invalid {flavor.name} identifier', scan.mark())
 
 
 symbol_tokens = sorted(
@@ -164,7 +176,7 @@ def read_symbol_token(scan):
 
 if __name__ == '__main__':
     import sys
-    from .scanner import SourceCode
+    from hidc.utils.scanner import SourceCode
 
     for tok in lex(SourceCode.from_file(sys.argv[1])):
         print(tok)
