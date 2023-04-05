@@ -10,12 +10,6 @@ class Token:
 class StringToken(Token):
     data: bytes
 
-    def __add__(self, other):
-        if not isinstance(other, StringToken):
-            return NotImplemented
-
-        return self.__class__(self.data + other.data)
-
 
 @dataclass(frozen=True)
 class IntToken(Token):

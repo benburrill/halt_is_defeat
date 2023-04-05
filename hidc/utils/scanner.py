@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 from collections.abc import Sequence
-from functools import wraps
-import typing as ty
 
 
 @dataclass
@@ -26,6 +24,9 @@ class SourceCode(Sequence):
 
     def __repr__(self):
         return f'SourceCode.from_file({self.filename!r})'
+
+
+
 
 @dataclass
 class Scanner:
@@ -64,7 +65,16 @@ class Scanner:
         return None
 
     def mark(self):
-        return Marker(self, self.line, self.col)
+        return Marker(self, self.cursor)
+
+    @property
+    def cursor(self):
+        return Cursor(self.line, self.col)
+
+    @cursor.setter
+    def cursor(self, cursor):
+        self.line = cursor.line
+        self.col = cursor.col
 
     @property
     def eol(self):
@@ -85,19 +95,45 @@ class Scanner:
         return f'<Scanner L{self.line+1} {self.source[self.line][self.col:]!r}>'
 
 
-@dataclass
-class Marker:
-    scan: Scanner
+@dataclass(frozen=True, order=True)
+class Cursor:
     line: int
     col: int
 
-    def update(self):
-        self.line = self.scan.line
-        self.col = self.scan.col
+    @property
+    def start(self):
+        return self
+
+    @property
+    def end(self):
+        return self
+
+@dataclass(frozen=True)
+class Span:
+    start: Cursor
+    end: Cursor
+
+    def __or__(self, other):
+        if isinstance(other, Cursor):
+            return Span(min(self.start, other),
+                        max(self.end, other))
+        elif isinstance(other, Span):
+            return self | other.start | other.end
+        return NotImplemented
+
+
+@dataclass
+class Marker:
+    scan: Scanner
+    cursor: Cursor
+
+    def advance(self):
+        old_cursor = self.cursor
+        self.cursor = self.scan.cursor
+        return Span(old_cursor, self.cursor)
 
     def restore(self):
-        self.scan.line = self.line
-        self.scan.col = self.col
+        self.scan.cursor = self.cursor
 
     # I don't think I'm actually going to use this as a context manager,
     # but it seems like a cool idea regardless
@@ -106,35 +142,3 @@ class Marker:
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.restore()
-
-    def collect(self, item):
-        old_line, old_col = self.line, self.col
-        self.update()
-        return Span(
-            item, self.scan.source,
-            (old_line, old_col),
-            (self.line, self.col)
-        )
-
-
-T = ty.TypeVar('T')
-@dataclass
-class Span(ty.Generic[T]):
-    item: T
-    source: SourceCode
-    start: tuple[int, int]
-    end: tuple[int, int]
-
-    def __repr__(self):
-        return f'<Span {self.item!r} in {self.source.filename} from {self.start}::{self.end}>'
-
-    # Idea here is some sort of decorator that takes stuff which may or
-    # may not wrapped in spans and wraps the return value in span that
-    # encompasses all the span-wrapped items.
-    # @classmethod
-    # def spanned(cls, func):
-    #     @wraps(func)
-    #     def wrapper(*args):
-    #         new_args = [arg.item if isinstance(arg, Span) else arg
-    #                     for arg in args]
-

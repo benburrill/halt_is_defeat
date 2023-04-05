@@ -5,12 +5,10 @@ def _message(m):
     return builder
 
 class CompilerError(Exception):
-    pass
+    def __init__(self, message, span):
+        super().__init__(message)
+        self.span = span
 
 class LexerError(CompilerError):
-    def __init__(self, message, marker):
-        super().__init__(message)
-        self.marker = marker
-
     unhelpful = _message('Invalid syntax')
     expected = _message('Invalid syntax, expected {need}')

@@ -6,7 +6,7 @@ from hidc.errors import LexerError
 from pytest import raises
 
 def lex_string(string):
-    return [span.item for span in lex(SourceCode.from_string(string))]
+    return [item.token for item in lex(SourceCode.from_string(string))]
 
 def test_lex_int():
     assert lex_string('42') == [IntToken(42)]
@@ -111,7 +111,6 @@ def test_tokens():
     assert lex_string('true')[0].data == True
     assert lex_string('0')[0].data == 0
     assert lex_string(r'"\x42"')[0].data == b'\x42'
-    assert lex_string(r'"a"')[0] + lex_string(r'"b"')[0] == lex_string(r'"ab"')[0]
     assert lex_string(r"'\x42'")[0].data == 0x42
     assert lex_string('+=')[0].operator is lex_string('+')[0]
     assert lex_string('(')[0].pair is lex_string(')')[0]
