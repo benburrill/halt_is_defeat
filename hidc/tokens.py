@@ -103,6 +103,7 @@ class StmtToken(EnumToken):
     BREAK = 'break'
     CONTINUE = 'continue'
     RETURN = 'return'
+    CONST = 'const'
 
 
 @include_enum
@@ -147,7 +148,6 @@ class TypeToken(EnumToken):
     BYTE = 'byte'
     STRING = 'string'
     VOID = 'void'
-    CONST = 'const'
 
 
 @include_enum

@@ -12,3 +12,6 @@ class CompilerError(Exception):
 class LexerError(CompilerError):
     unhelpful = _message('Invalid syntax')
     expected = _message('Invalid syntax, expected {need}')
+
+class ParserError(CompilerError):
+    pass
