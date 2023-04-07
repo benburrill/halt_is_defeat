@@ -26,8 +26,6 @@ class SourceCode(Sequence):
         return f'SourceCode.from_file({self.filename!r})'
 
 
-
-
 @dataclass
 class Scanner:
     source: SourceCode
@@ -92,7 +90,8 @@ class Scanner:
         return not (self.eol and self.line >= (len(self.source) - 1))
 
     def __repr__(self):
-        return f'<Scanner L{self.line+1} {self.source[self.line][self.col:]!r}>'
+        return (f'<Scanner {self.source.filename}:{self.cursor} '
+                f'{self.source[self.line][self.col:]!r}>')
 
 
 @dataclass(frozen=True, order=True)
@@ -108,6 +107,13 @@ class Cursor:
     def end(self):
         return self
 
+    def __str__(self):
+        return f'{self.line + 1}:{self.col + 1}'
+
+    def __repr__(self):
+        return f'<Cursor {self}>'
+
+
 @dataclass(frozen=True)
 class Span:
     start: Cursor
@@ -120,6 +126,9 @@ class Span:
         elif isinstance(other, Span):
             return self | other.start | other.end
         return NotImplemented
+
+    def __repr__(self):
+        return f'<Span {self.start} :: {self.end}>'
 
 
 @dataclass
