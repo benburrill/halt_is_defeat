@@ -14,4 +14,13 @@ class LexerError(CompilerError):
     expected = _message('Invalid syntax, expected {need}')
 
 class ParserError(CompilerError):
-    pass
+    @classmethod
+    async def expected(cls, need):
+        from .parser import CurrentNode
+        if node := await CurrentNode():
+            return cls(
+                f'Expected {need}, got unexpected token: {node.head.token}',
+                node.head.span
+            )
+
+        return cls(f'Expected {need}, found end of file', node.value)

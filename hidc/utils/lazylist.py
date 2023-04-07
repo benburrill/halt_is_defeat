@@ -9,8 +9,8 @@ class IteratorNode:
     def solidify(self):
         try:
             return Cons(next(self._iterator), self)
-        except StopIteration:
-            return Nil()
+        except StopIteration as ret:
+            return Nil(ret.value)
 
     def __repr__(self):
         return '...'
@@ -51,6 +51,7 @@ class Cons:
         while ll:
             yield ll.head
             ll = ll.tail
+        return ll.value
 
     def __iter__(self):
         return self._iter(self)
@@ -58,14 +59,20 @@ class Cons:
 
 
 class Nil:
+    # Nil's value represents the return value of generators
+    # We're using it for the end position of the last token
+    def __init__(self, value=None):
+        self.value = value
+
     def solidify(self):
         return self
 
     def __repr__(self):
-        return 'Nil'
+        return f'Nil({self.value})'
 
     def __bool__(self):
         return False
 
     def __iter__(self):
-        return iter(())
+        yield from ()
+        return self.value

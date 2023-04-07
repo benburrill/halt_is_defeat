@@ -1,36 +1,33 @@
-from .parser import Syntax, Exact, Instance
-from .errors import ParserError
-from .lexer import Lexeme
+from .parser import *
 from .tokens import *
 from .ast import *
+from .errors import ParserError
 
-import dataclasses
 
-
-@Syntax.builder('program')
-def syn_program(ps):
+@Parser.routine('program')
+async def ps_program():
     pass
 
 
-@Syntax.builder('scalar variable type')
-def syn_scalar_vtype(ps):
-    if tp := ps.parse(Instance(TypeToken)):
+@Parser.routine('scalar variable type')
+async def ps_scalar_vtype():
+    if tp := await Instance(TypeToken):
         if tp.token != TypeToken.VOID:
             return tp.token
 
 
-@Syntax.builder('variable type')
-def syn_vtype(ps):
-    if tp := ps.parse(syn_scalar_vtype()):
-        if ps.parse(Exact(BracToken.LSQUARE)):
-            ps.expect(Exact(BracToken.RSQUARE))
+@Parser.routine('variable type')
+async def ps_vtype():
+    if tp := await ps_scalar_vtype():
+        if await Exact(BracToken.LSQUARE):
+            await expect(Exact(BracToken.RSQUARE))
             return ArrayType(tp)
         return DataType(tp)
 
 
-@Syntax.builder('identifier')
-def syn_ident(ps, allowed_flavors):
-    if ident := ps.parse(Instance(IdentToken)):
+@Parser.routine('identifier')
+async def ps_ident(allowed_flavors):
+    if ident := await Instance(IdentToken):
         if ident.token.flavor in allowed_flavors:
             return ident
 
@@ -41,50 +38,50 @@ def syn_ident(ps, allowed_flavors):
         )
 
 
-@Syntax.builder('declaration')
-def syn_decl(ps):
-    const = bool(ps.parse(Exact(StmtToken.CONST)))
-    if dt := ps.parse(syn_vtype()):
-        ident = ps.expect(syn_ident({Flavor.NONE}), expected='variable name')
+@Parser.routine('declaration')
+async def ps_decl():
+    const = bool(await Exact(StmtToken.CONST))
+    if dt := await ps_vtype():
+        ident = await expect(ps_ident({Flavor.NONE}), expected='variable name')
         return Variable(const, dt, ident.token.name)
     elif const:
-        raise ps.unexpected(expected='data type after const')
+        raise await ParserError.expected('data type after const')
 
 
-@Syntax.builder('variable declaration')
-def syn_vdecl(ps):
-    start = ps.cursor
-    if var := ps.parse(syn_decl()):
-        if ps.parse(Exact(StmtToken.ASSIGN)):
-            return Declaration(var, ps.expect(syn_expr()), start)
-        elif brac := ps.parse(Exact(BracToken.LSQUARE)):
+@Parser.routine('variable declaration')
+async def ps_vdecl():
+    start = await cursor()
+    if var := await ps_decl():
+        if await Exact(StmtToken.ASSIGN):
+            return Declaration(var, await expect(ps_expr()), start)
+        elif brac := await Exact(BracToken.LSQUARE):
             if var.const:
                 raise ParserError('VLAs should not be declared const', start)
             elif isinstance(var.type, ArrayType):
                 raise ParserError('Unexpected [', brac.span)
-            var = dataclasses.replace(var, type=ArrayType(var.type.token))
-            init = ArrayInitializer(var.type, ps.expect(syn_expr()))
-            ps.expect(Exact(BracToken.RSQUARE))
-            return Declaration(var, init, start)
+            dt = ArrayType(var.type.token)
+            init = ArrayInitializer(dt, await expect(ps_expr()))
+            await expect(Exact(BracToken.RSQUARE))
+            return Declaration(Variable(False, dt, var.name), init, start)
         else:
-            raise ps.unexpected(expected='= or [')
+            raise await ParserError.expected('= or [')
 
 
-@Syntax.builder('expression')
-def syn_expr(ps):
-    if lxm := ps.parse(Instance(IntToken | CharToken)):
+@Parser.routine('expression')
+async def ps_expr():
+    if lxm := await Instance(IntToken | CharToken):
         return IntLiteral(lxm.token.data, lxm.span)
     # TODO
 
 
-@Syntax.builder('assignment')
-def syn_assignment(ps):
-    if assignable := ps.parse(syn_expr()):
+@Parser.routine('assignment')
+async def ps_assignment():
+    if assignable := await ps_expr():
         if isinstance(assignable, Assignable):
-            if ps.parse(Exact(StmtToken.ASSIGN)):
-                return Assignment(assignable, ps.expect(syn_expr()))
-            elif lxm := ps.parse(Instance(IncAssignToken)):
+            if await Exact(StmtToken.ASSIGN):
+                return Assignment(assignable, await expect(ps_expr()))
+            elif lxm := await Instance(IncAssignToken):
                 return IncAssignment(
-                    assignable, ps.expect(syn_expr()),
+                    assignable, await expect(ps_expr()),
                     lxm.token.operator
                 )

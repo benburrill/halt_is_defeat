@@ -18,11 +18,13 @@ def lex(source):
     ]
 
     scan = Scanner(source)
+    marker = scan.mark()
 
     while True:
         skip_whitespace(scan)
+
         if not scan:
-            break
+            return marker.cursor
 
         marker = scan.mark()
         for reader in tok_readers:

@@ -1,11 +1,26 @@
 from .tokens import Token
-from .utils.lazylist import Cons, Nil
-from .utils.scanner import Span, Cursor
+from .utils.lazylist import lazy_list
 from .errors import ParserError
+from .lexer import lex
 
 import abc
+import functools
 from dataclasses import dataclass
-from functools import wraps
+
+
+def parse(rule, source, partial=False):
+    if isinstance(rule, Parser):
+        rule = Parser(rule.consume, backtrack=False)
+    elif not isinstance(rule, Rule):
+        # coroutine passed directly, eg expect
+        rule = Parser((lambda r: lambda: r)(rule), backtrack=False)
+
+    result, remaining = rule.process(lazy_list(lex(source)))
+
+    if remaining and not partial:
+        raise ParserError(f'Unprocessed token: {remaining.token}', remaining.span)
+
+    return result
 
 
 class Rule(abc.ABC):
@@ -15,6 +30,10 @@ class Rule(abc.ABC):
     @abc.abstractmethod
     def process(self, start):
         pass
+
+    def __await__(self):
+        result = yield self
+        return result
 
 
 class Match(Rule):
@@ -48,77 +67,49 @@ class Instance(Match):
         return self.type.__name__
 
 
-class Syntax(Rule):
-    def __init__(self, func, *, expected=None):
-        self.func = func
+class Parser(Rule):
+    def __init__(self, consume, *, expected=None, backtrack=True):
+        self.consume = consume
         self.expected = expected
+        self.backtrack = backtrack
 
     @classmethod
-    def builder(cls, expected):
+    def routine(cls, expected):
         def decorator(func):
-            @wraps(func)
+            @functools.wraps(func)
             def wrapper(*args, **kwargs):
-                bound = lambda ps: func(ps, *args, **kwargs)
-                return cls(bound, expected=expected)
+                return cls(functools.partial(func, *args, **kwargs), expected=expected)
             return wrapper
         return decorator
 
     def process(self, start):
-        ps = Parser(start)
-        result = self.func(ps)
-        if result is not None:
-            return result, ps.remaining
-        return None, start
+        coro = self.consume()
+        cur = start
+        result = None
+        try:
+            while True:
+                result, cur = coro.send(result).process(cur)
+                if not self.backtrack:
+                    start = cur
+        except StopIteration as ret:
+            if ret.value is not None:
+                return ret.value, cur
+            return None, start
 
 
-@dataclass
-class Parser:
-    remaining: Cons | Nil
+class CurrentNode(Rule):
+    def process(self, start):
+        return start, start
 
-    def expect(self, rule, *, expected=None):
-        result, remaining = rule.process(self.remaining)
-        if result is not None:
-            self.remaining = remaining
-            return result
 
-        raise self.unexpected(expected or str(rule))
+async def cursor():
+    if node := await CurrentNode():
+        return node.head.span.start
+    return node.value
 
-    def unexpected(self, expected):
-        if not self.remaining:
-            return ParserError(
-                f'Expected {expected}, found end of file',
-                self.cursor
-            )
 
-        return ParserError(
-            f'Expected {expected}, '
-            f'found unexpected token: {self.remaining.head.token}',
-            self.remaining.head.span
-        )
-
-    def parse(self, rule):
-        result, self.remaining = rule.process(self.remaining)
+async def expect(rule, *, expected=None):
+    if (result := await rule) is not None:
         return result
 
-    def fork(self, rule):
-        result, remaining = rule.process(self.remaining)
-        return result, Parser(remaining)
-
-    def next(self):
-        node = self.remaining
-        if node:
-            self.remaining = node.tail
-            return node.head
-        return None
-
-    def __bool__(self):
-        return bool(self.remaining)
-
-    @property
-    def cursor(self):
-        if self.remaining:
-            return self.remaining.head.span.start
-
-        # TODO: do better than this?
-        # Ideally I'd like the end of the last token if there was one
-        return Cursor(-1, -1)
+    raise await ParserError.expected(expected or str(rule))
