@@ -39,6 +39,15 @@ def test_declaration():
         Anywhere()
     )
 
+    assert parse_string('int[] x = [1, 2, 3]', ps_vdecl(ctx)) == Declaration(
+        Variable(const=False, type=ArrayType(TypeToken.INT), name='x'),
+        ArrayLiteral((
+            IntLiteral(1, Anywhere()),
+            IntLiteral(2, Anywhere()),
+            IntLiteral(3, Anywhere())
+        ), Anywhere()), Anywhere()
+    )
+
     with raises(ParserError): parse_string('int x', ps_vdecl(ctx))
     with raises(ParserError): parse_string('const x = 5', ps_vdecl(ctx))
     with raises(ParserError): parse_string('aint x = 5', ps_vdecl(ctx))
@@ -48,3 +57,31 @@ def test_declaration():
     with raises(ParserError): parse_string('int[] x[5]', ps_vdecl(ctx))
     with raises(ParserError): parse_string('int x[5', ps_vdecl(ctx))
     with raises(ParserError): parse_string('int x[int x = 5]', ps_vdecl(ctx))
+
+def test_literal():
+    assert parse_string('42', ps_expr(ctx)) == IntLiteral(42, Anywhere())
+    assert (parse_string('0x42', ps_expr(ctx)) ==
+            IntLiteral(0x42, Anywhere()) ==
+            parse_string(r"'\x42'", ps_expr(ctx)))
+    assert parse_string('"hi"', ps_expr(ctx)) == StringLiteral(b'hi', Anywhere())
+    assert parse_string('true', ps_expr(ctx)) == BoolLiteral(True, Anywhere())
+
+    assert parse_string('[]', ps_expr(ctx)) == ArrayLiteral((), Anywhere())
+    assert parse_string('[1]', ps_expr(ctx)) == ArrayLiteral((
+        IntLiteral(1, Anywhere()),
+    ), Anywhere())
+
+    assert parse_string('[1,2]', ps_expr(ctx)) == ArrayLiteral((
+        IntLiteral(1, Anywhere()),
+        IntLiteral(2, Anywhere()),
+    ), Anywhere())
+
+    assert parse_string('[1,2,3]', ps_expr(ctx)) == ArrayLiteral((
+        IntLiteral(1, Anywhere()),
+        IntLiteral(2, Anywhere()),
+        IntLiteral(3, Anywhere()),
+    ), Anywhere())
+
+    with raises(ParserError): parse_string('[1,2', ps_expr(ctx))
+    with raises(ParserError): parse_string('[1,,2]', ps_expr(ctx))
+    with raises(ParserError): parse_string('[1,2,]', ps_expr(ctx))

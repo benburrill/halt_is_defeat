@@ -7,37 +7,6 @@ import enum
 from functools import cached_property
 
 
-# Oh cool, more enum breaking changes in Python 3.11, yay!
-# https://github.com/python/cpython/issues/103365
-#
-# I was hoping it would be easy to make it impossible to have TRY
-# without DEFEAT.  It would be easy in Python 3.10, but in Python 3.11
-# we'd probably need to handle this ourselves in _missing_.  I'm not
-# going to bother.
-class BlockContext(enum.IntFlag):
-    FUNC = 0
-    YOU = 1
-    DEFEAT = 2
-    LOOP = 4
-    TRY = DEFEAT | 8
-
-    @classmethod
-    def _missing_(cls, value):
-        bad = cls.YOU.value | cls.DEFEAT.value
-        if (bad & value) == bad:
-            raise ValueError(f'Invalid block context: {value}')
-        return super()._missing_(value)
-
-    @cached_property
-    def flavors(self):
-        flavors = frozenset({Flavor.NONE})
-        if BlockContext.YOU in self:
-            return flavors | {Flavor.YOU}
-        if BlockContext.DEFEAT in self:
-            return flavors | {Flavor.DEFEAT}
-        return flavors
-
-
 @Parser.routine('program')
 async def ps_program():
     pass
@@ -101,10 +70,31 @@ async def ps_vdecl(ctx):
             raise await ParserError.expected('= or [')
 
 
+# No need for this to be a Parser rule
+async def comma_list(rule):
+    if first := await rule:
+        yield first
+        while await Exact(SepToken.COMMA):
+            yield await expect(rule)
+
+
+@Parser.routine('literal')
+async def ps_literal(ctx):
+    if lit := await Instance(IntToken | CharToken):
+        return IntLiteral(lit.token.data, lit.span)
+    elif lit := await Instance(StringToken):
+        return StringLiteral(lit.token.data, lit.span)
+    elif lit := await Instance(BoolToken):
+        return BoolLiteral(lit.token.data, lit.span)
+    elif start := await Exact(BracToken.LSQUARE):
+        items = tuple([expr async for expr in comma_list(ps_expr(ctx))])
+        end = await expect(Exact(BracToken.RSQUARE))
+        return ArrayLiteral(items, Span(start.span.start, end.span.end))
+
+
 @Parser.routine('expression')
 async def ps_expr(ctx):
-    if lxm := await Instance(IntToken | CharToken):
-        return IntLiteral(lxm.token.data, lxm.span)
+    return await ps_literal(ctx)
     # TODO
 
 
@@ -194,3 +184,36 @@ async def ps_block(ctx):
             raise ParserError('preempt outside of try', start)
         return PreemptBlock(start, await expect(ps_block(ctx)))
     return ps_code_block(ctx)
+
+
+
+
+# Oh cool, more enum breaking changes in Python 3.11, yay!
+# https://github.com/python/cpython/issues/103365
+#
+# I was hoping it would be easy to make it impossible to have TRY
+# without DEFEAT.  It would be easy in Python 3.10, but in Python 3.11
+# we'd probably need to handle this ourselves in _missing_.  I'm not
+# going to bother.
+class BlockContext(enum.IntFlag):
+    FUNC   = 0
+    YOU    = 1
+    DEFEAT = 2
+    TRY    = 4 | DEFEAT
+    LOOP   = 8
+
+    @classmethod
+    def _missing_(cls, value):
+        bad = cls.YOU.value | cls.DEFEAT.value
+        if (bad & value) == bad:
+            raise ValueError(f'Invalid block context: {value}')
+        return super()._missing_(value)
+
+    @cached_property
+    def flavors(self):
+        flavors = frozenset({Flavor.NONE})
+        if BlockContext.YOU in self:
+            return flavors | {Flavor.YOU}
+        if BlockContext.DEFEAT in self:
+            return flavors | {Flavor.DEFEAT}
+        return flavors
