@@ -7,13 +7,19 @@ import enum
 from functools import cached_property
 
 
-class BlockContext(enum.Flag):
+# Oh cool, more enum breaking changes in Python 3.11, yay!
+# https://github.com/python/cpython/issues/103365
+#
+# I was hoping it would be easy to make it impossible to have TRY
+# without DEFEAT.  It would be easy in Python 3.10, but in Python 3.11
+# we'd probably need to handle this ourselves in _missing_.  I'm not
+# going to bother.
+class BlockContext(enum.IntFlag):
     FUNC = 0
-    YOU = enum.auto()
-    DEFEAT = enum.auto()
-    LOOP = enum.auto()
-    _TRY = enum.auto()
-    TRY = _TRY | DEFEAT
+    YOU = 1
+    DEFEAT = 2
+    LOOP = 4
+    TRY = DEFEAT | 8
 
     @classmethod
     def _missing_(cls, value):
