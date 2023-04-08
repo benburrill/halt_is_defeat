@@ -12,20 +12,13 @@ async def ps_program():
     pass
 
 
-@Parser.routine('scalar variable type')
-async def ps_scalar_vtype():
-    if tp := await Instance(TypeToken):
-        if tp.token != TypeToken.VOID:
-            return tp.token
-
-
 @Parser.routine('variable type')
 async def ps_vtype():
-    if tp := await ps_scalar_vtype():
+    if (tp := await Instance(TypeToken)) and tp.token != TypeToken.VOID:
         if await Exact(BracToken.LSQUARE):
             await expect(Exact(BracToken.RSQUARE))
-            return ArrayType(tp)
-        return DataType(tp)
+            return ArrayType(tp.token)
+        return DataType(tp.token)
 
 
 @Parser.routine('identifier')
@@ -52,18 +45,18 @@ async def ps_decl():
 
 
 @Parser.routine('variable declaration')
-async def ps_vdecl(ctx):
+async def ps_vdecl(expr_rule):
     start = await cursor()
     if var := await ps_decl():
         if await Exact(StmtToken.ASSIGN):
-            return Declaration(var, await expect(ps_expr(ctx)), start)
+            return Declaration(var, await expect(expr_rule), start)
         elif brac := await Exact(BracToken.LSQUARE):
             if var.const:
                 raise ParserError('VLAs should not be declared const', start)
             elif isinstance(var.type, ArrayType):
                 raise ParserError('Unexpected [', brac.span)
             dt = ArrayType(var.type.token)
-            init = ArrayInitializer(dt, await expect(ps_expr(ctx)))
+            init = ArrayInitializer(dt, await expect(expr_rule))
             await expect(Exact(BracToken.RSQUARE))
             return Declaration(Variable(False, dt, var.name), init, start)
         else:
@@ -79,7 +72,7 @@ async def comma_list(rule):
 
 
 @Parser.routine('literal')
-async def ps_literal(ctx):
+async def ps_literal(expr_rule):
     if lit := await Instance(IntToken | CharToken):
         return IntLiteral(lit.token.data, lit.span)
     elif lit := await Instance(StringToken):
@@ -87,14 +80,17 @@ async def ps_literal(ctx):
     elif lit := await Instance(BoolToken):
         return BoolLiteral(lit.token.data, lit.span)
     elif start := await Exact(BracToken.LSQUARE):
-        items = tuple([expr async for expr in comma_list(ps_expr(ctx))])
+        items = tuple([expr async for expr in comma_list(expr_rule)])
         end = await expect(Exact(BracToken.RSQUARE))
         return ArrayLiteral(items, Span(start.span.start, end.span.end))
 
+def self_recursive(routine):
+    ps = Parser(lambda: routine(ps).consume(), expected=str(routine()))
+    return ps
 
 @Parser.routine('expression')
 async def ps_expr(ctx):
-    return await ps_literal(ctx)
+    return await ps_literal(ps_expr(ctx))
     # TODO
 
 
