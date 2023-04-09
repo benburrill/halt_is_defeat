@@ -77,6 +77,10 @@ class ArrayLiteral(Expression):
     values: Sequence[Expression]
     span: Span
 
+    @property
+    def length(self):
+        return len(self.values)
+
 
 # Not really an expression, but let's pretend:
 @dataclass(frozen=True)
@@ -253,11 +257,16 @@ class TryBlock(ControlBlock):
 
 
 @dataclass(frozen=True)
+class FuncSignature:
+    name: Ident
+    params: Sequence[Variable]
+
+
+@dataclass(frozen=True)
 class FuncDeclaration(Statement):
     span: Span
     ret_type: DataType
-    name: Ident
-    params: Sequence[Variable]
+    signature: FuncSignature
     body: CodeBlock
 
 

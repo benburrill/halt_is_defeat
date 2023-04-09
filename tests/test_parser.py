@@ -137,7 +137,7 @@ def test_try():
         var_decls=(),
         func_decls=(FuncDeclaration(
             _, DataType(Type.VOID),
-            Ident.you('f'), (), CodeBlock((
+            FuncSignature(Ident.you('f'), ()), CodeBlock((
                 TryBlock(
                     _, CodeBlock((
                         PreemptBlock(_, CodeBlock.empty(_)),
@@ -192,8 +192,10 @@ def test_return():
     """, ps_program()) == Program(
         var_decls=(),
         func_decls=(FuncDeclaration(
-            _, DataType(Type.INT), Ident('f'),
-            (Variable(const=False, type=DataType(Type.INT), name='x'),),
+            _, DataType(Type.INT), FuncSignature(
+                Ident('f'),
+                (Variable(const=False, type=DataType(Type.INT), name='x'),)
+            ),
             CodeBlock((ReturnStatement(
                 _, BinaryOp(
                     Op.ADD, _,
@@ -331,7 +333,7 @@ def test_program():
         ),),
         func_decls=(FuncDeclaration(
             _, DataType(Type.VOID),
-            Ident.you('is_you'), (),
+            FuncSignature(Ident.you('is_you'), ()),
             CodeBlock.empty(_)
         ),)
     )

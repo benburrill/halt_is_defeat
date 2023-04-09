@@ -264,7 +264,7 @@ async def ps_func():
     body = await expect(ps_code_block(ctx))
     return FuncDeclaration(
         tp.span | end_decl.span,
-        ret_type, name.token, params, body
+        ret_type, FuncSignature(name.token, params), body
     )
 
 
