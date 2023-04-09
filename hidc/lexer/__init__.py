@@ -1,6 +1,6 @@
 import re
 from . import tokens
-from hidc.lexer.scanner import Scanner, Span, Cursor
+from hidc.lexer.scanner import Scanner, Span, Cursor, SourceCode
 from hidc.errors import LexerError
 
 from dataclasses import dataclass
@@ -182,11 +182,3 @@ def read_symbol_token(scan):
     for symbol in symbol_tokens:
         if scan.exact(str(symbol)):
             return symbol
-
-
-if __name__ == '__main__':
-    import sys
-    from hidc.lexer.scanner import SourceCode
-
-    for tok in lex(SourceCode.from_file(sys.argv[1])):
-        print(tok)

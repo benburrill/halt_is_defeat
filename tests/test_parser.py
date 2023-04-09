@@ -1,7 +1,7 @@
 from hidc.parser.grammar import *
 from hidc.errors import ParserError
 from hidc.parser import parse, expect
-from hidc.lexer.scanner import SourceCode, Span, Cursor
+from hidc.lexer import SourceCode, Span, Cursor
 
 import typing as ty
 from pytest import raises
