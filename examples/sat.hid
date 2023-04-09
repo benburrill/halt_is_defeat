@@ -1,0 +1,65 @@
+bool @satisfy(const int[] rules, bool[] result) {
+    try {
+        for (int i = 0; i < result.length; i += 1) {
+            preempt {
+                result[i] = not result[i];
+            }
+
+            preempt { continue; }
+            break;
+        }
+
+        if (not test_rules(rules, result)) {
+            !is_defeat();
+        }
+    } undo {
+        return false;
+    }
+
+    return true;
+}
+
+
+bool test_rules(const int[] rules, const bool[] vals) {
+    bool pass = false;
+    for (int i = 0; i < rules.length; i += 1) {
+        if (rules[i] == 0) {
+            if (not pass) {
+                return false;
+            }
+            pass = false;
+        } else if (pass) {
+            continue;
+        } else if (rules[i] < 0) {
+            pass = not vals[-rules[i] - 1];
+        } else {
+            pass = vals[rules[i] - 1];
+        }
+    }
+
+    return true;
+}
+
+
+void @is_you() {
+    bool result[3];
+    bool satisfiable = @satisfy([
+        1, 2, 3, 0,     // ((X1 | X2 | X3) &
+        -1, -2, -3, 0,  // (~X1 | ~X2 | ~X3) &
+        -1, 2, 0,       // (~X1 | X2) &
+        -2, 1, 0,       // (~X2 | X1) &
+        -1, 0           // (~X1))
+    ], result);
+
+    if (satisfiable) {
+        println("Satisfying solution:");
+        for (int i = 0; i < result.length; i += 1) {
+            print("X");
+            print(i + 1);
+            print(" = ");
+            println(result[i]);
+        }
+    } else {
+        println("Unsatisfiable");
+    }
+}
