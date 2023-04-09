@@ -248,3 +248,18 @@ class PreemptBlock(ControlBlock):
 @dataclass(frozen=True)
 class TryBlock(ControlBlock):
     handler: UndoBlock
+
+
+@dataclass(frozen=True)
+class FuncDeclaration(Statement):
+    span: Span
+    ret_type: DataType
+    name: IdentToken
+    params: Sequence[Variable]
+    body: CodeBlock
+
+
+@dataclass
+class Program:
+    var_decls: Sequence[Declaration]
+    func_decls: Sequence[FuncDeclaration]

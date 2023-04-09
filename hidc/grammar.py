@@ -7,11 +7,6 @@ import enum
 from functools import cached_property
 
 
-@Parser.routine('program')
-async def ps_program():
-    pass
-
-
 @Parser.routine('variable type')
 async def ps_vtype():
     if (tp := await Instance(TypeToken)) and tp.token != TypeToken.VOID:
@@ -84,9 +79,6 @@ async def ps_literal(expr_rule):
         end = await expect(Exact(BracToken.RSQUARE))
         return ArrayLiteral(items, Span(start.span.start, end.span.end))
 
-def self_recursive(routine):
-    ps = Parser(lambda: routine(ps).consume(), expected=str(routine()))
-    return ps
 
 @Parser.routine('expression')
 async def ps_expr(ctx):
@@ -111,7 +103,7 @@ async def ps_assignment(ctx):
 async def ps_plain_stmt(ctx, *, allow_decl=True):
     if stmt := (await ps_assignment(ctx) or await ps_expr(ctx)):
         return stmt
-    elif allow_decl and (stmt := await ps_vdecl(ctx)):
+    elif allow_decl and (stmt := await ps_vdecl(ps_expr(ctx))):
         return stmt
 
 
@@ -127,22 +119,26 @@ async def ps_stmt(ctx):
         return ContinueStatement(tok.span)
     elif tok := await Exact(StmtToken.RETURN):
         return ReturnStatement(tok.span, await ps_expr(ctx))
-    return await ps_block(ctx) or await ps_plain_stmt(ctx)
+    return await ps_plain_stmt(ctx)
 
 
-@Parser.routine('statements')
+@Parser.routine('code block')
 async def ps_code_block(ctx):
     if start := await Exact(BracToken.LCURLY):
         result = []
-        while stmt := await ps_stmt(ctx):
-            result.append(stmt)
-            await expect(Exact(SepToken.SEMICOLON))
+        while not (end := await Exact(BracToken.RCURLY)):
+            if stmt := await ps_stmt(ctx):
+                await expect(Exact(SepToken.SEMICOLON))
+                result.append(stmt)
+            else:
+                result.append(await expect(
+                    ps_block(ctx), expected='statement or block'
+                ))
 
-        end = await expect(Exact(BracToken.RCURLY), expected='statement or }')
         return CodeBlock(tuple(result), Span(start.span.start, end.span.end))
 
 
-@Parser.routine('block')
+@Parser.routine('block statement')
 async def ps_block(ctx):
     start = await cursor()
     if await Exact(BlockToken.IF):
@@ -179,9 +175,52 @@ async def ps_block(ctx):
         if BlockContext.TRY not in ctx:
             raise ParserError('preempt outside of try', start)
         return PreemptBlock(start, await expect(ps_block(ctx)))
-    return ps_code_block(ctx)
+    return await ps_code_block(ctx)
 
 
+@Parser.routine('function declaration')
+async def ps_func():
+    if not (tp := await Instance(TypeToken)): return
+    if not (name := await Instance(IdentToken)): return
+    if not await Exact(BracToken.LPAREN): return
+
+    ret_type = DataType(tp.token)
+    if name.token.flavor == Flavor.YOU:
+        ctx = BlockContext.YOU
+    elif name.token.flavor == Flavor.DEFEAT:
+        ctx = BlockContext.DEFEAT
+    else:
+        ctx = BlockContext.FUNC
+
+    params = tuple([expr async for expr in comma_list(ps_decl())])
+    end_decl = await expect(Exact(BracToken.RPAREN))
+    body = await expect(ps_code_block(ctx))
+    return FuncDeclaration(
+        Span(tp.span.start, end_decl.span.end),
+        ret_type, name.token, params, body
+    )
+
+
+@Parser.routine('program')
+async def ps_program():
+    var_decls = []
+    func_decls = []
+
+    # Not sure I want to deal with evaluating any expressions in global
+    # declarations, so only allow literals (recursively)
+    rec_lit = Parser(lambda: ps_literal(rec_lit).consume(),
+                     expected='literal value')
+
+    while await CurrentNode():
+        if var := await ps_vdecl(rec_lit):
+            var_decls.append(var)
+            await expect(Exact(SepToken.SEMICOLON))
+        else:
+            func_decls.append(await expect(
+                ps_func(), expected='function or variable declaration'
+            ))
+
+    return Program(tuple(var_decls), tuple(func_decls))
 
 
 # Oh cool, more enum breaking changes in Python 3.11, yay!

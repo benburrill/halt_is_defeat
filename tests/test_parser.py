@@ -16,11 +16,16 @@ tctx = BlockContext.TRY
 def parse_string(string, rule, partial=True):
     return parse(expect(rule), SourceCode.from_string(string), partial)
 
-class Anywhere:
+class Anywhere(Span, Cursor):
+    def __init__(self):
+        pass
+
     def __eq__(self, other):
         if isinstance(other, Span | Cursor):
             return True
         return NotImplemented
+
+    __repr__ = __str__ = lambda self: '_'
 
 _ = Anywhere()
 
@@ -78,3 +83,33 @@ def test_literal():
     with raises(ParserError): parse_string('[1,2', ps_expr(ctx))
     with raises(ParserError): parse_string('[1,,2]', ps_expr(ctx))
     with raises(ParserError): parse_string('[1,2,]', ps_expr(ctx))
+
+def test_program():
+    assert parse_string("""
+        void @f() {
+            try {} undo {}
+        }
+    """, ps_program()) == Program((), (FuncDeclaration(
+        _, DataType(TypeToken.VOID),
+        IdentToken('f', flavor=Flavor.YOU), (), CodeBlock((
+            TryBlock(_, CodeBlock((), _), UndoBlock(_, CodeBlock((), _))),
+        ), _)
+    ),))
+
+    with raises(ParserError): parse_string("""
+        void f() {
+            try {} undo {}
+        }
+    """, ps_program())
+
+    with raises(ParserError): parse_string("""
+        void !f() {
+            try {} undo {}
+        }
+    """, ps_program())
+
+def test_enum_sanity_again():
+    assert BlockContext.TRY in (BlockContext.TRY | BlockContext.LOOP)
+    assert BlockContext.YOU.flavors == frozenset({Flavor.YOU, Flavor.NONE})
+    with raises(ValueError): BlockContext.YOU | BlockContext.DEFEAT
+    with raises(ValueError): BlockContext.YOU | BlockContext.TRY
