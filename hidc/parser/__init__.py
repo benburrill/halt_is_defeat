@@ -1,7 +1,7 @@
-from .tokens import Token
-from .utils.lazylist import lazy_list
-from .errors import ParserError
-from .lexer import lex
+from hidc.lexer.tokens import Token
+from hidc.utils.lazylist import lazy_list
+from hidc.errors import ParserError
+from hidc.lexer import lex
 
 import abc
 import functools

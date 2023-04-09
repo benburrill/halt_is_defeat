@@ -1,7 +1,7 @@
-from .parser import *
-from .tokens import *
-from .ast import *
-from .errors import ParserError
+from hidc.parser import *
+from hidc.lexer.tokens import *
+from hidc.parser.ast import *
+from hidc.errors import ParserError
 
 import enum
 from functools import cached_property

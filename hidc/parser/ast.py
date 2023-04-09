@@ -1,6 +1,6 @@
-from .tokens import Op, Ident, Type
-from .utils.scanner import Span, Cursor
-from .utils.propertyclasses import *
+from hidc.lexer.tokens import Op, Ident, Type
+from hidc.lexer.scanner import Span, Cursor
+from hidc.utils.propertyclasses import *
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
