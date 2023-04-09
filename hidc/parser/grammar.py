@@ -194,7 +194,7 @@ async def ps_code_block(ctx):
             if stmt := await ps_stmt(ctx):
                 await expect(Exact(SepToken.SEMICOLON))
                 result.append(stmt)
-            else:
+            elif not await Exact(SepToken.SEMICOLON):
                 result.append(await expect(
                     ps_block(ctx), expected='statement or block'
                 ))
@@ -276,7 +276,7 @@ async def ps_program():
     while await CurrentNode():
         if func := await ps_func():
             func_decls.append(func)
-        else:
+        elif not await Exact(SepToken.SEMICOLON):
             var = await expect(
                 ps_vdecl(BlockContext.NONE),
                 expected='function or variable declaration'

@@ -318,10 +318,21 @@ def test_while():
         BoolLiteral(True, _), CodeBlock.empty(_)
     )
 
+def test_block():
+    assert parse_string('{}', ps_block(ctx)) == CodeBlock((), _)
+    assert parse_string('{ ; }', ps_block(ctx)) == CodeBlock((), _)
+    assert parse_string('{int x = 0;}', ps_block(ctx)) == CodeBlock((
+        Declaration(
+            Variable(const=False, type=DataType(Type.INT), name='x'),
+            IntLiteral(0, _), _
+        ),
+    ), _)
+
+    with raises(ParserError): assert parse_string('{int x = 0}', ps_block(ctx))
+
 def test_program():
-    assert parse_string("""
-        // Nothing here
-    """, ps_program()) == Program((), ())
+    assert parse_string('// Nothing here', ps_program()) == Program((), ())
+    assert parse_string(';', ps_program()) == Program((), ())
 
     assert parse_string("""
         int x = -5;
