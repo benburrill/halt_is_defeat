@@ -79,7 +79,7 @@ class ArrayLiteral(Expression):
 
     @property
     def length(self):
-        return len(self.values)
+        return IntLiteral(len(self.values), self.span)
 
 
 # Not really an expression, but let's pretend:
