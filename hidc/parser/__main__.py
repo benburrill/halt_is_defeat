@@ -1,6 +1,5 @@
 from hidc.lexer import SourceCode
-from hidc.parser import parse
-from hidc.parser.grammar import ps_program
+from hidc.parser import parse, ps_program
 from pprint import pprint
 
 def main(filename):

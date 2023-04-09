@@ -1,22 +1,22 @@
 import enum
-from dataclasses import dataclass
+import dataclasses as dc
 
 
 class Token:
     pass
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class StringToken(Token):
     data: bytes
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class IntToken(Token):
     data: int
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class CharToken(Token):
     data: int
 
@@ -32,7 +32,7 @@ class Flavor(enum.Enum):
         return self.value
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class Ident(Token):
     base_name: str
     flavor: Flavor = Flavor.NONE

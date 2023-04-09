@@ -16,7 +16,7 @@ class LexerError(CompilerError):
 class ParserError(CompilerError):
     @classmethod
     async def expected(cls, need):
-        from hidc.parser import CurrentNode
+        from hidc.parser.rules import CurrentNode
         if node := await CurrentNode():
             return cls(
                 f'Expected {need}, got unexpected token: {node.head.token}',

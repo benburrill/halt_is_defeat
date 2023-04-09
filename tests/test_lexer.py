@@ -1,6 +1,5 @@
 from hidc.lexer.tokens import *
-from hidc.lexer import lex, SourceCode
-from hidc.errors import LexerError
+from hidc.lexer import lex, SourceCode, LexerError
 
 from pytest import raises
 

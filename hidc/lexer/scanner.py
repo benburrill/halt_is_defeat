@@ -1,8 +1,8 @@
-from dataclasses import dataclass
+import dataclasses as dc
 from collections.abc import Sequence
 
 
-@dataclass
+@dc.dataclass
 class SourceCode(Sequence):
     filename: str
     lines: Sequence[str]
@@ -26,7 +26,7 @@ class SourceCode(Sequence):
         return f'SourceCode.from_file({self.filename!r})'
 
 
-@dataclass
+@dc.dataclass
 class Scanner:
     source: SourceCode
     line: int = 0
@@ -94,7 +94,7 @@ class Scanner:
                 f'{self.source[self.line][self.col:]!r}>')
 
 
-@dataclass(frozen=True, order=True)
+@dc.dataclass(frozen=True, order=True)
 class Cursor:
     line: int
     col: int
@@ -114,7 +114,7 @@ class Cursor:
         return f'<Cursor {self}>'
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class Span:
     start: Cursor
     end: Cursor
@@ -131,7 +131,7 @@ class Span:
         return f'<Span {self.start} :: {self.end}>'
 
 
-@dataclass
+@dc.dataclass
 class Marker:
     scan: Scanner
     cursor: Cursor

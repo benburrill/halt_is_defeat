@@ -1,22 +1,22 @@
 from hidc.lexer.tokens import Op, Ident, Type
 from hidc.lexer.scanner import Span, Cursor
-from hidc.utils.propertyclasses import *
+import hidc.utils.propertyclasses as pc
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+import dataclasses as dc
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class DataType:
     token: Type
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class ArrayType(DataType):
     pass
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class Variable:
     const: bool
     type: DataType
@@ -31,7 +31,7 @@ class Expression(Statement):
     pass
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class BinaryOp(Expression):
     op: Op
     op_span: Span
@@ -43,7 +43,7 @@ class BinaryOp(Expression):
         return self.left.span | self.right.span
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class UnaryOp(Expression):
     op: Op
     op_span: Span
@@ -54,25 +54,25 @@ class UnaryOp(Expression):
         return self.op_span | self.expr.span
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class IntLiteral(Expression):
     data: int
     span: Span
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class StringLiteral(Expression):
     data: bytes
     span: Span
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class BoolLiteral(Expression):
     data: bool
     span: Span
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class ArrayLiteral(Expression):
     values: Sequence[Expression]
     span: Span
@@ -83,7 +83,7 @@ class ArrayLiteral(Expression):
 
 
 # Not really an expression, but let's pretend:
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class ArrayInitializer(Expression):
     type: ArrayType
     length: Expression
@@ -97,13 +97,13 @@ class Assignable(Expression):
     pass
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class VariableLookup(Assignable):
     var: str
     span: Span
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class ArrayLookup(Assignable):
     source: Expression
     index: Expression
@@ -114,7 +114,7 @@ class ArrayLookup(Assignable):
         return self.source.span | self.end
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class LengthLookup(Expression):
     source: Expression
     end: Cursor
@@ -124,14 +124,14 @@ class LengthLookup(Expression):
         return self.source.span | self.end
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class FuncCall(Expression):
     func: Ident
     args: Sequence[Expression]
     span: Span
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class Declaration(Statement):
     var: Variable
     init: Expression
@@ -142,7 +142,7 @@ class Declaration(Statement):
         return self.init.span | self.start
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class Assignment(Statement):
     lookup: Assignable
     expr: Expression
@@ -152,21 +152,21 @@ class Assignment(Statement):
         return self.lookup.span | self.expr.span
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class IncAssignment(Assignment):
     op: Op
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class ReturnStatement(Statement):
     span: Span
     value: Expression = None
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class BreakStatement(Statement):
     span: Span
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class ContinueStatement(Statement):
     span: Span
 
@@ -174,7 +174,7 @@ class Block(Statement):
     span: Span
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class CodeBlock(Block, Sequence):
     stmts: Sequence[Statement]
     span: Span
@@ -193,7 +193,7 @@ class CodeBlock(Block, Sequence):
         return True
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class ControlBlock(Block):
     start: Cursor
     body: Block
@@ -203,14 +203,14 @@ class ControlBlock(Block):
         return self.body.span | self.start
 
 
-@add_properties
-@dataclass(frozen=True)
+@pc.add_properties
+@dc.dataclass(frozen=True)
 class LoopBlock(ControlBlock):
     cond: Expression
-    _cont: Statement = internal_field(default=None)
-    cont: CodeBlock = field(init=False)
+    _cont: Statement = pc.internal_field(default=None)
+    cont: CodeBlock = dc.field(init=False)
 
-    @property_field
+    @pc.property_field
     @property
     def cont(self):
         if self._cont is None:
@@ -226,14 +226,14 @@ class LoopBlock(ControlBlock):
         ), Span(start, body.span.end))
 
 
-@add_properties
-@dataclass(frozen=True)
+@pc.add_properties
+@dc.dataclass(frozen=True)
 class IfBlock(ControlBlock):
     cond: Expression
-    _else_block: Block = internal_field(default=None)
-    else_block: Block = field(init=False)
+    _else_block: Block = pc.internal_field(default=None)
+    else_block: Block = dc.field(init=False)
 
-    @property_field
+    @pc.property_field
     @property
     def else_block(self):
         if self._else_block is None:
@@ -241,28 +241,28 @@ class IfBlock(ControlBlock):
         return self._else_block
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class UndoBlock(ControlBlock):
     pass
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class PreemptBlock(ControlBlock):
     pass
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class TryBlock(ControlBlock):
     handler: UndoBlock
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class FuncSignature:
     name: Ident
     params: Sequence[Variable]
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class FuncDeclaration(Statement):
     span: Span
     ret_type: DataType
@@ -270,7 +270,7 @@ class FuncDeclaration(Statement):
     body: CodeBlock
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class Program:
     var_decls: Sequence[Declaration]
     func_decls: Sequence[FuncDeclaration]
