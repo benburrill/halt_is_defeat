@@ -6,7 +6,7 @@ from hidc.parser import rules
 from hidc.parser.grammar import ps_program
 
 
-def parse(rule, source, partial=False):
+def parse(source, rule=ps_program(), partial=False):
     if isinstance(rule, rules.Parser):
         rule = rules.Parser(rule.consume, backtrack=False)
     elif not isinstance(rule, rules.Rule):

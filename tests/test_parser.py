@@ -12,7 +12,7 @@ yctx = BlockContext.YOU
 dctx = BlockContext.DEFEAT
 
 def parse_string(string, rule, partial=True):
-    return parse(expect(rule), SourceCode.from_string(string), partial)
+    return parse(SourceCode.from_string(string), expect(rule), partial)
 
 class Any:
     def __init__(self, cls):
