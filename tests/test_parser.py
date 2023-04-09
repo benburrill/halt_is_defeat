@@ -1,33 +1,31 @@
 from hidc.ast import *
 from hidc.grammar import *
 from hidc.tokens import *
-from hidc.parser import parse, expect
-
-from hidc.utils.scanner import SourceCode, Span, Cursor
 from hidc.errors import ParserError
+from hidc.parser import parse, expect
+from hidc.utils.scanner import SourceCode, Span, Cursor
 
+import typing as ty
 from pytest import raises
 
 ctx = BlockContext.FUNC
 yctx = BlockContext.YOU
 dctx = BlockContext.DEFEAT
-tctx = BlockContext.TRY
 
 def parse_string(string, rule, partial=True):
     return parse(expect(rule), SourceCode.from_string(string), partial)
 
-class Anywhere(Span, Cursor):
-    def __init__(self):
-        pass
+class Any:
+    def __init__(self, cls):
+        self.cls = cls
 
     def __eq__(self, other):
-        if isinstance(other, Span | Cursor):
-            return True
-        return NotImplemented
+        return isinstance(other, self.cls)
 
-    __repr__ = __str__ = lambda self: '_'
+    def __repr__(self):
+        return '_'
 
-_ = Anywhere()
+_: ty.Any = Any(Span | Cursor)
 
 def test_declaration():
     assert parse_string('int x = 42', ps_vdecl(ps_expr(ctx))) == Declaration(
@@ -83,30 +81,270 @@ def test_literal():
     with raises(ParserError): parse_string('[1,2', ps_expr(ctx))
     with raises(ParserError): parse_string('[1,,2]', ps_expr(ctx))
     with raises(ParserError): parse_string('[1,2,]', ps_expr(ctx))
+    with raises(ParserError): parse_string('[1 2]', ps_expr(ctx))
 
-def test_program():
+def test_precedence():
+    assert parse_string('1 + 2 + 3', ps_expr(ctx)) == BinaryOp(
+        OpToken.ADD, _,
+        BinaryOp(OpToken.ADD, _, IntLiteral(1, _), IntLiteral(2, _)),
+        IntLiteral(3, _)
+    )
+
+    assert parse_string('1 + (2 + 3)', ps_expr(ctx)) == BinaryOp(
+        OpToken.ADD, _,
+        IntLiteral(1, _),
+        BinaryOp(OpToken.ADD, _, IntLiteral(2, _), IntLiteral(3, _))
+    )
+
+    assert parse_string('1 + 2 * 3', ps_expr(ctx)) == BinaryOp(
+        OpToken.ADD, _,
+        IntLiteral(1, _),
+        BinaryOp(OpToken.MUL, _, IntLiteral(2, _), IntLiteral(3, _))
+    )
+
+    assert parse_string('1 + -2', ps_expr(ctx)) == BinaryOp(
+        OpToken.ADD, _, IntLiteral(1, _),
+        UnaryOp(OpToken.SUB, _, IntLiteral(2, _))
+    )
+
+def test_func_flavor():
+    assert (
+        parse_string('f(x)', ps_expr(ctx)) ==
+        parse_string('f(x)', ps_expr(yctx)) ==
+        parse_string('f(x)', ps_expr(dctx)) ==
+        FuncCall(IdentToken('f', Flavor.NONE), (VariableLookup('x', _),), _)
+    )
+
+    assert parse_string('!f(x)', ps_expr(dctx)) == FuncCall(
+        IdentToken('f', Flavor.DEFEAT), (VariableLookup('x', _),), _
+    )
+
+    assert parse_string('@f(x)', ps_expr(yctx)) == FuncCall(
+        IdentToken('f', Flavor.YOU), (VariableLookup('x', _),), _
+    )
+
+    with raises(ParserError): parse_string('!f(x)', ps_expr(ctx))
+    with raises(ParserError): parse_string('!f(x)', ps_expr(yctx))
+    with raises(ParserError): parse_string('@f(x)', ps_expr(ctx))
+    with raises(ParserError): parse_string('@f(x)', ps_expr(dctx))
+
+
+def test_try():
     assert parse_string("""
         void @f() {
-            try {} undo {}
+            try { preempt {} } undo {}
         }
-    """, ps_program()) == Program((), (FuncDeclaration(
-        _, DataType(TypeToken.VOID),
-        IdentToken('f', flavor=Flavor.YOU), (), CodeBlock((
-            TryBlock(_, CodeBlock((), _), UndoBlock(_, CodeBlock((), _))),
-        ), _)
-    ),))
+    """, ps_program()) == Program(
+        var_decls=(),
+        func_decls=(FuncDeclaration(
+            _, DataType(TypeToken.VOID),
+            IdentToken('f', Flavor.YOU), (), CodeBlock((
+                TryBlock(
+                    _, CodeBlock((
+                        PreemptBlock(_, CodeBlock.empty(_)),
+                    ), _),
+                    UndoBlock(_, CodeBlock.empty(_))),
+            ), _)
+        ),)
+    )
 
+def test_out_of_place():
     with raises(ParserError): parse_string("""
         void f() {
-            try {} undo {}
+            try { preempt {} } undo {}
         }
     """, ps_program())
 
     with raises(ParserError): parse_string("""
         void !f() {
-            try {} undo {}
+            try { preempt {} } undo {}
         }
     """, ps_program())
+
+    with raises(ParserError): parse_string("""
+        void @f() {
+            try { try {} undo {} } undo {}
+        }
+    """, ps_program())
+
+    with raises(ParserError): parse_string("""
+        void @f() {
+            preempt {}
+        }
+    """, ps_program())
+
+    with raises(ParserError): parse_string("""
+        void f() {
+            break;
+        }
+    """, ps_program())
+
+    with raises(ParserError): parse_string("""
+        void f() {
+            continue;
+        }
+    """, ps_program())
+
+def test_return():
+    assert parse_string("""
+        int f(int x) {
+            return x + 1;
+        }
+    """, ps_program()) == Program(
+        var_decls=(),
+        func_decls=(FuncDeclaration(
+            _, DataType(TypeToken.INT), IdentToken('f', Flavor.NONE),
+            (Variable(const=False, type=DataType(TypeToken.INT), name='x'),),
+            CodeBlock((ReturnStatement(
+                _, BinaryOp(
+                    OpToken.ADD, _,
+                    VariableLookup('x', _), IntLiteral(1, _)
+                )
+            ),), _)
+        ),)
+    )
+
+def test_for():
+    assert parse_string("""
+        for (int i = 0; i < arr.length; i += 1) {
+            arr[i] = 0;
+        }
+    """, ps_block(ctx)) == CodeBlock((
+        Declaration(
+            Variable(const=False, type=DataType(TypeToken.INT), name='i'),
+            IntLiteral(0, _), _
+        ),
+        LoopBlock(
+            _, CodeBlock((
+                Assignment(
+                    ArrayLookup(VariableLookup('arr', _), VariableLookup('i', _), _),
+                    IntLiteral(0, _)
+                ),
+            ),_),
+            BinaryOp(OpToken.LT, _,
+                     VariableLookup('i', _),
+                     LengthLookup(VariableLookup('arr', _), _)),
+            CodeBlock((
+                IncAssignment(VariableLookup('i', _), IntLiteral(1, _), OpToken.ADD),
+            ), _)
+        )
+    ), _)
+
+    with raises(ParserError): parse_string("""
+        for (int i = 0; i < arr.length; i += 1)
+    """, ps_block(ctx))
+
+    with raises(ParserError): parse_string("""
+        for (int i = 0; i < arr.length; int i = 1) {
+            arr[i] = 0;
+        }
+    """, ps_block(ctx))
+
+    with raises(ParserError): parse_string("""
+        for (int i = 0; i += 1; i += 1) {
+            arr[i] = 0;
+        }
+    """, ps_block(ctx))
+
+    with raises(ParserError): parse_string("""
+        for (return; i < arr.length; i += 1) {
+            arr[i] = 0;
+        }
+    """, ps_block(ctx))
+
+def test_if():
+    assert parse_string("""
+        if (x == 1 or y == 2) {
+            println("potato");
+        }
+    """, ps_block(ctx)) == IfBlock(
+        _, CodeBlock((
+            FuncCall(
+                IdentToken('println', Flavor.NONE),
+                (StringLiteral(b'potato', _),), _
+            ),
+        ), _),
+        BinaryOp(
+            OpToken.OR, _,
+            BinaryOp(OpToken.EQ, _, VariableLookup('x', _), IntLiteral(1, _)),
+            BinaryOp(OpToken.EQ, _, VariableLookup('y', _), IntLiteral(2, _))
+        ),
+        CodeBlock.empty(_)
+    )
+
+def test_else():
+    assert parse_string("""
+        if (a) {
+            1;
+        } else if (b) {
+            2;
+        } else if (c) {
+            3;
+        } else {
+            4;
+        }
+    """, ps_block(ctx)) == IfBlock(
+        _, CodeBlock((IntLiteral(1, _),),_),
+        VariableLookup('a', _),
+        IfBlock(
+            _, CodeBlock((IntLiteral(2, _),), _),
+            VariableLookup('b', _),
+            IfBlock(
+                _, CodeBlock((IntLiteral(3, _),), _),
+                VariableLookup('c', _),
+                CodeBlock((IntLiteral(4, _),), _)
+            )
+        )
+    )
+
+def test_while():
+    assert parse_string("""
+        while (true) {
+            if (false) {
+                continue;
+            }
+            break;
+        }
+    """, ps_block(ctx)) == LoopBlock(
+        _, CodeBlock((
+            IfBlock(
+                _, CodeBlock((ContinueStatement(_),), _),
+                BoolLiteral(False,_),
+                CodeBlock.empty(_)
+            ),
+            BreakStatement(_),
+        ), _),
+        BoolLiteral(True, _), CodeBlock.empty(_)
+    )
+
+def test_program():
+    assert parse_string("""
+        // Nothing here
+    """, ps_program()) == Program((), ())
+
+    assert parse_string("""
+        int x = 0;
+        void @is_you() {}
+    """, ps_program()) == Program(
+        var_decls=(Declaration(
+            Variable(const=False, type=DataType(TypeToken.INT), name='x'),
+            IntLiteral(0, _), _
+        ),),
+        func_decls=(FuncDeclaration(
+            _, DataType(TypeToken.VOID),
+            IdentToken('is_you', Flavor.YOU), (),
+            CodeBlock.empty(_)
+        ),)
+    )
+
+def test_weird_int_again():
+    # Follow-up from lexer tests
+    with raises(ParserError): parse_string('int x = 0_;', ps_program())
+    with raises(ParserError): parse_string('int x = 1__000;', ps_program())
+    with raises(ParserError): parse_string('int x = 0b;', ps_program())
+    with raises(ParserError): parse_string('int x = 0b_;', ps_program())
+    with raises(ParserError): parse_string('int x = 0b_0;', ps_program())
+    with raises(ParserError): parse_string('int x = 0b0_;', ps_program())
 
 def test_enum_sanity_again():
     assert BlockContext.TRY in (BlockContext.TRY | BlockContext.LOOP)

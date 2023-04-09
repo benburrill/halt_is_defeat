@@ -6,6 +6,7 @@ from .lexer import lex
 import abc
 import functools
 from dataclasses import dataclass
+from collections.abc import Collection
 
 
 def parse(rule, source, partial=False):
@@ -18,7 +19,10 @@ def parse(rule, source, partial=False):
     result, remaining = rule.process(lazy_list(lex(source)))
 
     if remaining and not partial:
-        raise ParserError(f'Unprocessed token: {remaining.token}', remaining.span)
+        raise ParserError(
+            f'Unprocessed token: {remaining.head.token}',
+            remaining.head.span
+        )
 
     return result
 
@@ -65,6 +69,16 @@ class Instance(Match):
 
     def __str__(self):
         return self.type.__name__
+
+
+@dataclass
+class OneOf(Match):
+    tokens: Collection[Token]
+    def match(self, token):
+        return token in self.tokens
+
+    def __str__(self):
+        return f'one of {list(self.tokens)}'
 
 
 class Parser(Rule):

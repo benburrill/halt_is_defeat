@@ -60,10 +60,21 @@ async def ps_vdecl(expr_rule):
 
 # No need for this to be a Parser rule
 async def comma_list(rule):
+    result = []
     if first := await rule:
-        yield first
+        result.append(first)
         while await Exact(SepToken.COMMA):
-            yield await expect(rule)
+            result.append(await expect(rule))
+    return tuple(result)
+
+
+# left associative binary op
+async def bin_op(expr_rule, ops):
+    if not (expr := await expr_rule): return
+    while op := await OneOf(ops):
+        right = await expect(expr_rule)
+        expr = BinaryOp(op.token, op.span, expr, right)
+    return expr
 
 
 @Parser.routine('literal')
@@ -75,15 +86,72 @@ async def ps_literal(expr_rule):
     elif lit := await Instance(BoolToken):
         return BoolLiteral(lit.token.data, lit.span)
     elif start := await Exact(BracToken.LSQUARE):
-        items = tuple([expr async for expr in comma_list(expr_rule)])
+        items = await comma_list(expr_rule)
         end = await expect(Exact(BracToken.RSQUARE))
-        return ArrayLiteral(items, Span(start.span.start, end.span.end))
+        return ArrayLiteral(items, start.span | end.span)
+
+
+@Parser.routine('function call')
+async def ps_func_call(ctx):
+    if ident := await ps_ident(ctx.flavors):
+        if await Exact(BracToken.LPAREN):
+            args = await comma_list(ps_expr(ctx))
+            end = await expect(Exact(BracToken.RPAREN))
+            return FuncCall(ident.token, args, ident.span | end.span)
 
 
 @Parser.routine('expression')
-async def ps_expr(ctx):
+async def ps_expr0(ctx):
+    if await Exact(BracToken.LPAREN):
+        expr = await expect(ps_expr(ctx))
+        await expect(Exact(BracToken.RPAREN))
+        return expr
+    elif func_call := await ps_func_call(ctx):
+        return func_call
+    elif ident := await ps_ident({Flavor.NONE}):
+        return VariableLookup(ident.token.name, ident.span)
     return await ps_literal(ps_expr(ctx))
-    # TODO
+
+@Parser.routine('expression')
+async def ps_expr1(ctx):
+    if not (expr := await ps_expr0(ctx)): return
+    if await Exact(SepToken.DOT):
+        attr = await expect(Exact(IdentToken('length', Flavor.NONE)))
+        return LengthLookup(expr, attr.span.end)
+    if await Exact(BracToken.LSQUARE):
+        index = await expect(ps_expr(ctx))
+        end = await expect(Exact(BracToken.RSQUARE))
+        return ArrayLookup(expr, index, end.span.end)
+    return expr
+
+@Parser.routine('expression')
+async def ps_expr2(ctx):
+    if op := await OneOf({OpToken.ADD, OpToken.SUB, OpToken.NOT}):
+        return UnaryOp(op.token, op.span, await expect(ps_expr2(ctx)))
+    return await ps_expr1(ctx)
+
+@Parser.routine('expression')
+async def ps_expr3(ctx):
+    return await bin_op(ps_expr2(ctx), {OpToken.MUL, OpToken.DIV, OpToken.MOD})
+
+@Parser.routine('expression')
+async def ps_expr4(ctx):
+    return await bin_op(ps_expr3(ctx), {OpToken.ADD, OpToken.SUB})
+
+@Parser.routine('expression')
+async def ps_expr5(ctx):
+    return await bin_op(ps_expr4(ctx), {
+        OpToken.LT, OpToken.LE, OpToken.GT, OpToken.GE,
+        OpToken.EQ, OpToken.NE
+    })
+
+@Parser.routine('expression')
+async def ps_expr6(ctx):
+    return await bin_op(ps_expr5(ctx), {OpToken.AND})
+
+@Parser.routine('expression')
+async def ps_expr(ctx):
+    return await bin_op(ps_expr6(ctx), {OpToken.OR})
 
 
 @Parser.routine('assignment')
@@ -135,7 +203,7 @@ async def ps_code_block(ctx):
                     ps_block(ctx), expected='statement or block'
                 ))
 
-        return CodeBlock(tuple(result), Span(start.span.start, end.span.end))
+        return CodeBlock(tuple(result), start.span | end.span)
 
 
 @Parser.routine('block statement')
@@ -157,11 +225,14 @@ async def ps_block(ctx):
     elif await Exact(BlockToken.FOR):
         await expect(Exact(BracToken.LPAREN))
         init = await ps_plain_stmt(ctx, allow_decl=True)
-        await expect(Exact(SepToken.SEMICOLON))
+        await expect(Exact(SepToken.SEMICOLON),
+                     expected='statement' if not init else ';')
         cond = await ps_expr(ctx)
-        await expect(Exact(SepToken.SEMICOLON))
+        await expect(Exact(SepToken.SEMICOLON),
+                     expected='expression' if not cond else ';')
         cont = await ps_plain_stmt(ctx, allow_decl=False)
-        await expect(Exact(BracToken.RPAREN))
+        await expect(Exact(BracToken.RPAREN),
+                     expected='assignment or expression' if not cont else ')')
         body = await expect(ps_block(ctx | BlockContext.LOOP))
         return LoopBlock.for_loop(start, body, init, cond, cont)
     elif await Exact(BlockToken.TRY):
@@ -192,11 +263,11 @@ async def ps_func():
     else:
         ctx = BlockContext.FUNC
 
-    params = tuple([expr async for expr in comma_list(ps_decl())])
+    params = await comma_list(ps_decl())
     end_decl = await expect(Exact(BracToken.RPAREN))
     body = await expect(ps_code_block(ctx))
     return FuncDeclaration(
-        Span(tp.span.start, end_decl.span.end),
+        tp.span | end_decl.span,
         ret_type, name.token, params, body
     )
 
@@ -212,13 +283,16 @@ async def ps_program():
                      expected='literal value')
 
     while await CurrentNode():
-        if var := await ps_vdecl(rec_lit):
-            var_decls.append(var)
-            await expect(Exact(SepToken.SEMICOLON))
+        if func := await ps_func():
+            func_decls.append(func)
         else:
-            func_decls.append(await expect(
-                ps_func(), expected='function or variable declaration'
-            ))
+            var = await expect(
+                ps_vdecl(rec_lit),
+                expected='function or variable declaration'
+            )
+
+            await expect(Exact(SepToken.SEMICOLON))
+            var_decls.append(var)
 
     return Program(tuple(var_decls), tuple(func_decls))
 

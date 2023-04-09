@@ -40,7 +40,7 @@ class BinaryOp(Expression):
 
     @property
     def span(self):
-        return Span(self.left.span.start, self.right.span.end)
+        return self.left.span | self.right.span
 
 
 @dataclass(frozen=True)
@@ -51,7 +51,7 @@ class UnaryOp(Expression):
 
     @property
     def span(self):
-        return Span(self.op_span.start, self.expr.span.end)
+        return self.op_span | self.expr.span
 
 
 @dataclass(frozen=True)
@@ -107,7 +107,7 @@ class ArrayLookup(Assignable):
 
     @property
     def span(self):
-        return Span(self.source.span.start, self.end)
+        return self.source.span | self.end
 
 
 @dataclass(frozen=True)
@@ -117,9 +117,10 @@ class LengthLookup(Expression):
 
     @property
     def span(self):
-        return Span(self.source.span.start, self.end)
+        return self.source.span | self.end
 
 
+@dataclass(frozen=True)
 class FuncCall(Expression):
     func: IdentToken
     args: Sequence[Expression]
@@ -134,7 +135,7 @@ class Declaration(Statement):
 
     @property
     def span(self):
-        return Span(self.start, self.init.span.end)
+        return self.init.span | self.start
 
 
 @dataclass(frozen=True)
@@ -144,7 +145,7 @@ class Assignment(Statement):
 
     @property
     def span(self):
-        return Span(self.lookup.span.start, self.expr.span.end)
+        return self.lookup.span | self.expr.span
 
 
 @dataclass(frozen=True)
@@ -195,7 +196,7 @@ class ControlBlock(Block):
 
     @property
     def span(self):
-        return Span(self.start, self.body.span.end)
+        return self.body.span | self.start
 
 
 @add_properties
@@ -203,7 +204,7 @@ class ControlBlock(Block):
 class LoopBlock(ControlBlock):
     cond: Expression
     _cont: Statement = internal_field(default=None)
-    cont: Block = field(init=False)
+    cont: CodeBlock = field(init=False)
 
     @property_field
     @property
@@ -221,6 +222,7 @@ class LoopBlock(ControlBlock):
         ), Span(start, body.span.end))
 
 
+@add_properties
 @dataclass(frozen=True)
 class IfBlock(ControlBlock):
     cond: Expression
