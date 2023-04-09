@@ -27,35 +27,35 @@ class Any:
 _: ty.Any = Any(Span | Cursor)
 
 def test_declaration():
-    assert parse_string('int x = 42', ps_vdecl(ps_expr(ctx))) == Declaration(
+    assert parse_string('int x = 42', ps_vdecl(ctx)) == Declaration(
         Variable(const=False, type=DataType(Type.INT), name='x'),
         IntLiteral(42, _), _
     )
 
-    assert parse_string("const byte x = 'B'", ps_vdecl(ps_expr(ctx))) == Declaration(
+    assert parse_string("const byte x = 'B'", ps_vdecl(ctx)) == Declaration(
         Variable(const=True, type=DataType(Type.BYTE), name='x'),
         IntLiteral(ord('B'), _), _
     )
 
-    assert parse_string('bool x[5]', ps_vdecl(ps_expr(ctx))) == Declaration(
+    assert parse_string('bool x[5]', ps_vdecl(ctx)) == Declaration(
         Variable(const=False, type=ArrayType(Type.BOOL), name='x'),
         ArrayInitializer(ArrayType(Type.BOOL), IntLiteral(5, _)), _
     )
 
-    assert parse_string('int[] x = [1, 2, 3]', ps_vdecl(ps_expr(ctx))) == Declaration(
+    assert parse_string('int[] x = [1, 2, 3]', ps_vdecl(ctx)) == Declaration(
         Variable(const=False, type=ArrayType(Type.INT), name='x'),
         ArrayLiteral((IntLiteral(1, _), IntLiteral(2, _), IntLiteral(3, _)), _), _
     )
 
-    with raises(ParserError): parse_string('int x', ps_vdecl(ps_expr(ctx)))
-    with raises(ParserError): parse_string('const x = 5', ps_vdecl(ps_expr(ctx)))
-    with raises(ParserError): parse_string('aint x = 5', ps_vdecl(ps_expr(ctx)))
-    with raises(ParserError): parse_string('int @x = 5', ps_vdecl(ps_expr(ctx)))
-    with raises(ParserError): parse_string('int x = int x = 5', ps_vdecl(ps_expr(ctx)))
-    with raises(ParserError): parse_string('const int x[5]', ps_vdecl(ps_expr(ctx)))
-    with raises(ParserError): parse_string('int[] x[5]', ps_vdecl(ps_expr(ctx)))
-    with raises(ParserError): parse_string('int x[5', ps_vdecl(ps_expr(ctx)))
-    with raises(ParserError): parse_string('int x[int x = 5]', ps_vdecl(ps_expr(ctx)))
+    with raises(ParserError): parse_string('int x', ps_vdecl(ctx))
+    with raises(ParserError): parse_string('const x = 5', ps_vdecl(ctx))
+    with raises(ParserError): parse_string('aint x = 5', ps_vdecl(ctx))
+    with raises(ParserError): parse_string('int @x = 5', ps_vdecl(ctx))
+    with raises(ParserError): parse_string('int x = int x = 5', ps_vdecl(ctx))
+    with raises(ParserError): parse_string('const int x[5]', ps_vdecl(ctx))
+    with raises(ParserError): parse_string('int[] x[5]', ps_vdecl(ctx))
+    with raises(ParserError): parse_string('int x[5', ps_vdecl(ctx))
+    with raises(ParserError): parse_string('int x[int x = 5]', ps_vdecl(ctx))
 
 def test_literal():
     assert parse_string('42', ps_expr(ctx)) == IntLiteral(42, _)
@@ -322,12 +322,12 @@ def test_program():
     """, ps_program()) == Program((), ())
 
     assert parse_string("""
-        int x = 0;
+        int x = -5;
         void @is_you() {}
     """, ps_program()) == Program(
         var_decls=(Declaration(
             Variable(const=False, type=DataType(Type.INT), name='x'),
-            IntLiteral(0, _), _
+            UnaryOp(Op.SUB, _, IntLiteral(5, _)), _
         ),),
         func_decls=(FuncDeclaration(
             _, DataType(Type.VOID),
@@ -335,6 +335,10 @@ def test_program():
             CodeBlock.empty(_)
         ),)
     )
+
+    with raises(ParserError): parse_string('int x = f(5);', ps_program())
+    with raises(ParserError): parse_string('int x = @f(5);', ps_program())
+    with raises(ParserError): parse_string('int x = !f(5);', ps_program())
 
 def test_weird_int_again():
     # Follow-up from lexer tests

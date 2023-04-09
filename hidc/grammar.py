@@ -40,18 +40,18 @@ async def ps_decl():
 
 
 @Parser.routine('variable declaration')
-async def ps_vdecl(expr_rule):
+async def ps_vdecl(ctx):
     start = await cursor()
     if var := await ps_decl():
         if await Exact(StmtToken.ASSIGN):
-            return Declaration(var, await expect(expr_rule), start)
+            return Declaration(var, await expect(ps_expr(ctx)), start)
         elif brac := await Exact(BracToken.LSQUARE):
             if var.const:
                 raise ParserError('VLAs should not be declared const', start)
             elif isinstance(var.type, ArrayType):
                 raise ParserError('Unexpected [', brac.span)
             dt = ArrayType(var.type.token)
-            init = ArrayInitializer(dt, await expect(expr_rule))
+            init = ArrayInitializer(dt, await expect(ps_expr(ctx)))
             await expect(Exact(BracToken.RSQUARE))
             return Declaration(Variable(False, dt, var.name), init, start)
         else:
@@ -77,22 +77,9 @@ async def bin_op(expr_rule, ops):
     return expr
 
 
-@Parser.routine('literal')
-async def ps_literal(expr_rule):
-    if lit := await Instance(IntToken | CharToken):
-        return IntLiteral(lit.token.data, lit.span)
-    elif lit := await Instance(StringToken):
-        return StringLiteral(lit.token.data, lit.span)
-    elif lit := await Instance(BoolToken):
-        return BoolLiteral(lit.token.data, lit.span)
-    elif start := await Exact(BracToken.LSQUARE):
-        items = await comma_list(expr_rule)
-        end = await expect(Exact(BracToken.RSQUARE))
-        return ArrayLiteral(items, start.span | end.span)
-
-
 @Parser.routine('function call')
 async def ps_func_call(ctx):
+    if BlockContext.FUNC not in ctx: return
     if ident := await ps_ident(ctx.flavors):
         if await Exact(BracToken.LPAREN):
             args = await comma_list(ps_expr(ctx))
@@ -106,11 +93,20 @@ async def ps_expr0(ctx):
         expr = await expect(ps_expr(ctx))
         await expect(Exact(BracToken.RPAREN))
         return expr
+    elif lit := await Instance(IntToken | CharToken):
+        return IntLiteral(lit.token.data, lit.span)
+    elif lit := await Instance(StringToken):
+        return StringLiteral(lit.token.data, lit.span)
+    elif lit := await Instance(BoolToken):
+        return BoolLiteral(lit.token.data, lit.span)
+    elif start := await Exact(BracToken.LSQUARE):
+        items = await comma_list(ps_expr(ctx))
+        end = await expect(Exact(BracToken.RSQUARE))
+        return ArrayLiteral(items, start.span | end.span)
     elif func_call := await ps_func_call(ctx):
         return func_call
     elif ident := await ps_ident({Flavor.NONE}):
         return VariableLookup(ident.token.name, ident.span)
-    return await ps_literal(ps_expr(ctx))
 
 @Parser.routine('expression')
 async def ps_expr1(ctx):
@@ -171,7 +167,7 @@ async def ps_assignment(ctx):
 async def ps_plain_stmt(ctx, *, allow_decl=True):
     if stmt := (await ps_assignment(ctx) or await ps_expr(ctx)):
         return stmt
-    elif allow_decl and (stmt := await ps_vdecl(ps_expr(ctx))):
+    elif allow_decl and (stmt := await ps_vdecl(ctx)):
         return stmt
 
 
@@ -277,17 +273,12 @@ async def ps_program():
     var_decls = []
     func_decls = []
 
-    # Not sure I want to deal with evaluating any expressions in global
-    # declarations, so only allow literals (recursively)
-    rec_lit = Parser(lambda: ps_literal(rec_lit).consume(),
-                     expected='literal value')
-
     while await CurrentNode():
         if func := await ps_func():
             func_decls.append(func)
         else:
             var = await expect(
-                ps_vdecl(rec_lit),
+                ps_vdecl(BlockContext.NONE),
                 expected='function or variable declaration'
             )
 
@@ -305,11 +296,12 @@ async def ps_program():
 # we'd probably need to handle this ourselves in _missing_.  I'm not
 # going to bother.
 class BlockContext(enum.IntFlag):
-    FUNC   = 0
-    YOU    = 1
-    DEFEAT = 2
-    TRY    = 4 | DEFEAT
-    LOOP   = 8
+    NONE   = 0
+    FUNC   = 1
+    YOU    = 2 | FUNC
+    DEFEAT = 4 | FUNC
+    TRY    = 8 | DEFEAT
+    LOOP   = 16
 
     @classmethod
     def _missing_(cls, value):
@@ -320,9 +312,11 @@ class BlockContext(enum.IntFlag):
 
     @cached_property
     def flavors(self):
-        flavors = frozenset({Flavor.NONE})
+        flavors = frozenset({})
+        if BlockContext.FUNC in self:
+            flavors |= {Flavor.NONE}
         if BlockContext.YOU in self:
-            return flavors | {Flavor.YOU}
+            flavors |= {Flavor.YOU}
         if BlockContext.DEFEAT in self:
-            return flavors | {Flavor.DEFEAT}
+            flavors |= {Flavor.DEFEAT}
         return flavors
