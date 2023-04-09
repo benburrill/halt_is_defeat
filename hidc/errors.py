@@ -9,6 +9,14 @@ class CompilerError(Exception):
         super().__init__(message)
         self.span = span
 
+    def get_info(self, source):
+        # Mimic gcc error messages
+        line = self.span.start.line
+        col = self.span.start.col
+        return (f'{source.filename}:{self.span.start}: {self}\n'
+                f'{line + 1:5} | {source.lines[line]}\n'
+                f'      | ' + (' ' * col) + '^')
+
 class LexerError(CompilerError):
     unhelpful = _message('Invalid syntax')
     expected = _message('Invalid syntax, expected {need}')
