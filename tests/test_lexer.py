@@ -16,18 +16,18 @@ def test_lex_int():
     assert lex_string('0b101') == [IntToken(0b101)]
     assert lex_string('1_000') == [IntToken(1000)]
     assert lex_string('0b1_1') == [IntToken(0b11)]
-    assert lex_string('_1000') == [IdentToken('_1000', Flavor.NONE)]
+    assert lex_string('_1000') == [Ident('_1000')]
 
 def test_weird_int():
     # At least for the time being, I'm not producing lexer errors for
     # stuff that looks a bit like ints but aren't.  Instead it will be
     # handled by by the parser.
-    assert lex_string('0_') == [IntToken(0), IdentToken('_', Flavor.NONE)]
-    assert lex_string('1__000') == [IntToken(1), IdentToken('__000', Flavor.NONE)]
-    assert lex_string('0b') == [IntToken(0), IdentToken('b', Flavor.NONE)]
-    assert lex_string('0b_') == [IntToken(0), IdentToken('b_', Flavor.NONE)]
-    assert lex_string('0b_0') == [IntToken(0), IdentToken('b_0', Flavor.NONE)]
-    assert lex_string('0b0_') == [IntToken(0), IdentToken('_', Flavor.NONE)]
+    assert lex_string('0_') == [IntToken(0), Ident('_')]
+    assert lex_string('1__000') == [IntToken(1), Ident('__000')]
+    assert lex_string('0b') == [IntToken(0), Ident('b')]
+    assert lex_string('0b_') == [IntToken(0), Ident('b_')]
+    assert lex_string('0b_0') == [IntToken(0), Ident('b_0')]
+    assert lex_string('0b0_') == [IntToken(0), Ident('_')]
 
 def test_lex_string():
     assert lex_string(r'"hello"') == [StringToken(b'hello')]
@@ -68,25 +68,25 @@ def test_lex_char():
     with raises(LexerError): lex_string(r"'\'")
 
 def test_lex_ident():
-    assert lex_string('potato42') == [IdentToken('potato42', Flavor.NONE)]
-    assert lex_string('!is_defeat') == [IdentToken('is_defeat', Flavor.DEFEAT)]
-    assert lex_string('@is_you') == [IdentToken('is_you', Flavor.YOU)]
+    assert lex_string('potato42') == [Ident('potato42')]
+    assert lex_string('!is_defeat') == [Ident.defeat('is_defeat')]
+    assert lex_string('@is_you') == [Ident.you('is_you')]
 
     with raises(LexerError): lex_string('!42')
     with raises(LexerError): lex_string('@42')
 
 def test_lex_keyword():
     assert lex_string('for') == [BlockToken.FOR]
-    assert lex_string('for ever') == [BlockToken.FOR, IdentToken('ever', Flavor.NONE)]
-    assert lex_string('forever') == [IdentToken('forever', Flavor.NONE)]
-    assert lex_string('@forever') == [IdentToken('forever', Flavor.YOU)]
-    assert lex_string('!forever') == [IdentToken('forever', Flavor.DEFEAT)]
+    assert lex_string('for ever') == [BlockToken.FOR, Ident('ever')]
+    assert lex_string('forever') == [Ident('forever')]
+    assert lex_string('@forever') == [Ident.you('forever')]
+    assert lex_string('!forever') == [Ident.defeat('forever')]
 
     with raises(LexerError): lex_string('@for')
     with raises(LexerError): lex_string('!for')
 
 def test_lex_symbol():
-    assert lex_string('x+1') == [IdentToken('x', Flavor.NONE), OpToken.ADD, IntToken(1)]
+    assert lex_string('x+1') == [Ident('x'), Op.ADD, IntToken(1)]
     assert lex_string('+=') == [IncAssignToken.IADD]
 
 def test_large():
@@ -97,10 +97,10 @@ def test_large():
             }
         }
     ''') == [
-        TypeToken.VOID, IdentToken('is_you', Flavor.YOU),
+        Type.VOID, Ident.you('is_you'),
         BracToken.LPAREN, BracToken.RPAREN, BracToken.LCURLY,
             BlockToken.IF, BracToken.LPAREN, BoolToken.TRUE, BracToken.RPAREN, BracToken.LCURLY,
-                IdentToken('println', Flavor.NONE), BracToken.LPAREN,
+                Ident('println'), BracToken.LPAREN,
                     StringToken(b'Hello world!'),
                 BracToken.RPAREN, SepToken.SEMICOLON,
             BracToken.RCURLY,
@@ -129,12 +129,12 @@ def test_syntax():
     with raises(LexerError): lex_string('#')
 
 def test_enum_sanity():
-    assert OpToken.ADD != '+'
-    assert str(OpToken.ADD) == OpToken.ADD.value == '+'
-    assert OpToken('+') is OpToken.ADD
-    assert isinstance(OpToken.ADD, Token)
-    assert isinstance(OpToken.ADD.value, str)
-    assert not isinstance(OpToken.ADD.value, Token)
+    assert Op.ADD != '+'
+    assert str(Op.ADD) == Op.ADD.value == '+'
+    assert Op('+') is Op.ADD
+    assert isinstance(Op.ADD, Token)
+    assert isinstance(Op.ADD.value, str)
+    assert not isinstance(Op.ADD.value, Token)
 
     assert Flavor.YOU != '@'
     assert str(Flavor.YOU) == Flavor.YOU.value == '@'

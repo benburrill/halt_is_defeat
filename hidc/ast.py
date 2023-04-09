@@ -1,4 +1,4 @@
-from .tokens import OpToken, IdentToken, TypeToken
+from .tokens import Op, Ident, Type
 from .utils.scanner import Span, Cursor
 from .utils.propertyclasses import *
 
@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class DataType:
-    token: TypeToken
+    token: Type
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ class Expression(Statement):
 
 @dataclass(frozen=True)
 class BinaryOp(Expression):
-    op: OpToken
+    op: Op
     op_span: Span
     left: Expression
     right: Expression
@@ -45,7 +45,7 @@ class BinaryOp(Expression):
 
 @dataclass(frozen=True)
 class UnaryOp(Expression):
-    op: OpToken
+    op: Op
     op_span: Span
     expr: Expression
 
@@ -122,7 +122,7 @@ class LengthLookup(Expression):
 
 @dataclass(frozen=True)
 class FuncCall(Expression):
-    func: IdentToken
+    func: Ident
     args: Sequence[Expression]
     span: Span
 
@@ -150,7 +150,7 @@ class Assignment(Statement):
 
 @dataclass(frozen=True)
 class IncAssignment(Assignment):
-    op: OpToken
+    op: Op
 
 
 @dataclass(frozen=True)
@@ -256,7 +256,7 @@ class TryBlock(ControlBlock):
 class FuncDeclaration(Statement):
     span: Span
     ret_type: DataType
-    name: IdentToken
+    name: Ident
     params: Sequence[Variable]
     body: CodeBlock
 

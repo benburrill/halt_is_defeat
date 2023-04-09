@@ -1,6 +1,5 @@
 from hidc.ast import *
 from hidc.grammar import *
-from hidc.tokens import *
 from hidc.errors import ParserError
 from hidc.parser import parse, expect
 from hidc.utils.scanner import SourceCode, Span, Cursor
@@ -29,22 +28,22 @@ _: ty.Any = Any(Span | Cursor)
 
 def test_declaration():
     assert parse_string('int x = 42', ps_vdecl(ps_expr(ctx))) == Declaration(
-        Variable(const=False, type=DataType(TypeToken.INT), name='x'),
+        Variable(const=False, type=DataType(Type.INT), name='x'),
         IntLiteral(42, _), _
     )
 
     assert parse_string("const byte x = 'B'", ps_vdecl(ps_expr(ctx))) == Declaration(
-        Variable(const=True, type=DataType(TypeToken.BYTE), name='x'),
+        Variable(const=True, type=DataType(Type.BYTE), name='x'),
         IntLiteral(ord('B'), _), _
     )
 
     assert parse_string('bool x[5]', ps_vdecl(ps_expr(ctx))) == Declaration(
-        Variable(const=False, type=ArrayType(TypeToken.BOOL), name='x'),
-        ArrayInitializer(ArrayType(TypeToken.BOOL), IntLiteral(5, _)), _
+        Variable(const=False, type=ArrayType(Type.BOOL), name='x'),
+        ArrayInitializer(ArrayType(Type.BOOL), IntLiteral(5, _)), _
     )
 
     assert parse_string('int[] x = [1, 2, 3]', ps_vdecl(ps_expr(ctx))) == Declaration(
-        Variable(const=False, type=ArrayType(TypeToken.INT), name='x'),
+        Variable(const=False, type=ArrayType(Type.INT), name='x'),
         ArrayLiteral((IntLiteral(1, _), IntLiteral(2, _), IntLiteral(3, _)), _), _
     )
 
@@ -85,26 +84,26 @@ def test_literal():
 
 def test_precedence():
     assert parse_string('1 + 2 + 3', ps_expr(ctx)) == BinaryOp(
-        OpToken.ADD, _,
-        BinaryOp(OpToken.ADD, _, IntLiteral(1, _), IntLiteral(2, _)),
+        Op.ADD, _,
+        BinaryOp(Op.ADD, _, IntLiteral(1, _), IntLiteral(2, _)),
         IntLiteral(3, _)
     )
 
     assert parse_string('1 + (2 + 3)', ps_expr(ctx)) == BinaryOp(
-        OpToken.ADD, _,
+        Op.ADD, _,
         IntLiteral(1, _),
-        BinaryOp(OpToken.ADD, _, IntLiteral(2, _), IntLiteral(3, _))
+        BinaryOp(Op.ADD, _, IntLiteral(2, _), IntLiteral(3, _))
     )
 
     assert parse_string('1 + 2 * 3', ps_expr(ctx)) == BinaryOp(
-        OpToken.ADD, _,
+        Op.ADD, _,
         IntLiteral(1, _),
-        BinaryOp(OpToken.MUL, _, IntLiteral(2, _), IntLiteral(3, _))
+        BinaryOp(Op.MUL, _, IntLiteral(2, _), IntLiteral(3, _))
     )
 
     assert parse_string('1 + -2', ps_expr(ctx)) == BinaryOp(
-        OpToken.ADD, _, IntLiteral(1, _),
-        UnaryOp(OpToken.SUB, _, IntLiteral(2, _))
+        Op.ADD, _, IntLiteral(1, _),
+        UnaryOp(Op.SUB, _, IntLiteral(2, _))
     )
 
 def test_func_flavor():
@@ -112,15 +111,15 @@ def test_func_flavor():
         parse_string('f(x)', ps_expr(ctx)) ==
         parse_string('f(x)', ps_expr(yctx)) ==
         parse_string('f(x)', ps_expr(dctx)) ==
-        FuncCall(IdentToken('f', Flavor.NONE), (VariableLookup('x', _),), _)
+        FuncCall(Ident('f'), (VariableLookup('x', _),), _)
     )
 
     assert parse_string('!f(x)', ps_expr(dctx)) == FuncCall(
-        IdentToken('f', Flavor.DEFEAT), (VariableLookup('x', _),), _
+        Ident.defeat('f'), (VariableLookup('x', _),), _
     )
 
     assert parse_string('@f(x)', ps_expr(yctx)) == FuncCall(
-        IdentToken('f', Flavor.YOU), (VariableLookup('x', _),), _
+        Ident.you('f'), (VariableLookup('x', _),), _
     )
 
     with raises(ParserError): parse_string('!f(x)', ps_expr(ctx))
@@ -137,8 +136,8 @@ def test_try():
     """, ps_program()) == Program(
         var_decls=(),
         func_decls=(FuncDeclaration(
-            _, DataType(TypeToken.VOID),
-            IdentToken('f', Flavor.YOU), (), CodeBlock((
+            _, DataType(Type.VOID),
+            Ident.you('f'), (), CodeBlock((
                 TryBlock(
                     _, CodeBlock((
                         PreemptBlock(_, CodeBlock.empty(_)),
@@ -193,11 +192,11 @@ def test_return():
     """, ps_program()) == Program(
         var_decls=(),
         func_decls=(FuncDeclaration(
-            _, DataType(TypeToken.INT), IdentToken('f', Flavor.NONE),
-            (Variable(const=False, type=DataType(TypeToken.INT), name='x'),),
+            _, DataType(Type.INT), Ident('f'),
+            (Variable(const=False, type=DataType(Type.INT), name='x'),),
             CodeBlock((ReturnStatement(
                 _, BinaryOp(
-                    OpToken.ADD, _,
+                    Op.ADD, _,
                     VariableLookup('x', _), IntLiteral(1, _)
                 )
             ),), _)
@@ -211,7 +210,7 @@ def test_for():
         }
     """, ps_block(ctx)) == CodeBlock((
         Declaration(
-            Variable(const=False, type=DataType(TypeToken.INT), name='i'),
+            Variable(const=False, type=DataType(Type.INT), name='i'),
             IntLiteral(0, _), _
         ),
         LoopBlock(
@@ -221,11 +220,11 @@ def test_for():
                     IntLiteral(0, _)
                 ),
             ),_),
-            BinaryOp(OpToken.LT, _,
+            BinaryOp(Op.LT, _,
                      VariableLookup('i', _),
                      LengthLookup(VariableLookup('arr', _), _)),
             CodeBlock((
-                IncAssignment(VariableLookup('i', _), IntLiteral(1, _), OpToken.ADD),
+                IncAssignment(VariableLookup('i', _), IntLiteral(1, _), Op.ADD),
             ), _)
         )
     ), _)
@@ -260,14 +259,14 @@ def test_if():
     """, ps_block(ctx)) == IfBlock(
         _, CodeBlock((
             FuncCall(
-                IdentToken('println', Flavor.NONE),
+                Ident('println'),
                 (StringLiteral(b'potato', _),), _
             ),
         ), _),
         BinaryOp(
-            OpToken.OR, _,
-            BinaryOp(OpToken.EQ, _, VariableLookup('x', _), IntLiteral(1, _)),
-            BinaryOp(OpToken.EQ, _, VariableLookup('y', _), IntLiteral(2, _))
+            Op.OR, _,
+            BinaryOp(Op.EQ, _, VariableLookup('x', _), IntLiteral(1, _)),
+            BinaryOp(Op.EQ, _, VariableLookup('y', _), IntLiteral(2, _))
         ),
         CodeBlock.empty(_)
     )
@@ -327,12 +326,12 @@ def test_program():
         void @is_you() {}
     """, ps_program()) == Program(
         var_decls=(Declaration(
-            Variable(const=False, type=DataType(TypeToken.INT), name='x'),
+            Variable(const=False, type=DataType(Type.INT), name='x'),
             IntLiteral(0, _), _
         ),),
         func_decls=(FuncDeclaration(
-            _, DataType(TypeToken.VOID),
-            IdentToken('is_you', Flavor.YOU), (),
+            _, DataType(Type.VOID),
+            Ident.you('is_you'), (),
             CodeBlock.empty(_)
         ),)
     )

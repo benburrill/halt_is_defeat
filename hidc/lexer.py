@@ -161,13 +161,13 @@ def read_ident_or_keyword_token(scan):
     elif ident := scan.match(ident_pattern):
         if ident in keyword_tokens:
             return keyword_tokens[ident]
-        return tokens.IdentToken(ident, tokens.Flavor.NONE)
+        return tokens.Ident(ident)
     else:
         return None
 
     if ident := scan.match(ident_pattern):
         if ident not in keyword_tokens:
-            return tokens.IdentToken(ident, flavor)
+            return tokens.Ident(ident, flavor)
 
     raise LexerError(f'Invalid {flavor.name} identifier', scan.cursor)
 

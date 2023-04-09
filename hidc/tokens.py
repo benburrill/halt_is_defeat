@@ -33,9 +33,17 @@ class Flavor(enum.Enum):
 
 
 @dataclass(frozen=True)
-class IdentToken(Token):
+class Ident(Token):
     base_name: str
-    flavor: Flavor
+    flavor: Flavor = Flavor.NONE
+
+    @classmethod
+    def you(cls, name):
+        return cls(name, Flavor.YOU)
+
+    @classmethod
+    def defeat(cls, name):
+        return cls(name, Flavor.DEFEAT)
 
     @property
     def name(self):
@@ -67,7 +75,7 @@ def include_enum(cls):
 
 
 @include_enum
-class OpToken(EnumToken):
+class Op(EnumToken):
     ADD = '+'
     SUB = '-'
     MUL = '*'
@@ -94,7 +102,7 @@ class IncAssignToken(EnumToken):
 
     @property
     def operator(self):
-        return OpToken(self.value[:-1])
+        return Op(self.value[:-1])
 
 
 @include_enum
@@ -142,7 +150,7 @@ class BlockToken(EnumToken):
 
 
 @include_enum
-class TypeToken(EnumToken):
+class Type(EnumToken):
     INT = 'int'
     BOOL = 'bool'
     BYTE = 'byte'

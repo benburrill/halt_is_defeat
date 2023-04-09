@@ -9,7 +9,7 @@ from functools import cached_property
 
 @Parser.routine('variable type')
 async def ps_vtype():
-    if (tp := await Instance(TypeToken)) and tp.token != TypeToken.VOID:
+    if (tp := await Instance(Type)) and tp.token != Type.VOID:
         if await Exact(BracToken.LSQUARE):
             await expect(Exact(BracToken.RSQUARE))
             return ArrayType(tp.token)
@@ -18,7 +18,7 @@ async def ps_vtype():
 
 @Parser.routine('identifier')
 async def ps_ident(allowed_flavors):
-    if ident := await Instance(IdentToken):
+    if ident := await Instance(Ident):
         if ident.token.flavor in allowed_flavors:
             return ident
 
@@ -116,7 +116,7 @@ async def ps_expr0(ctx):
 async def ps_expr1(ctx):
     if not (expr := await ps_expr0(ctx)): return
     if await Exact(SepToken.DOT):
-        attr = await expect(Exact(IdentToken('length', Flavor.NONE)))
+        attr = await expect(Exact(Ident('length')))
         return LengthLookup(expr, attr.span.end)
     if await Exact(BracToken.LSQUARE):
         index = await expect(ps_expr(ctx))
@@ -126,32 +126,32 @@ async def ps_expr1(ctx):
 
 @Parser.routine('expression')
 async def ps_expr2(ctx):
-    if op := await OneOf({OpToken.ADD, OpToken.SUB, OpToken.NOT}):
+    if op := await OneOf({Op.ADD, Op.SUB, Op.NOT}):
         return UnaryOp(op.token, op.span, await expect(ps_expr2(ctx)))
     return await ps_expr1(ctx)
 
 @Parser.routine('expression')
 async def ps_expr3(ctx):
-    return await bin_op(ps_expr2(ctx), {OpToken.MUL, OpToken.DIV, OpToken.MOD})
+    return await bin_op(ps_expr2(ctx), {Op.MUL, Op.DIV, Op.MOD})
 
 @Parser.routine('expression')
 async def ps_expr4(ctx):
-    return await bin_op(ps_expr3(ctx), {OpToken.ADD, OpToken.SUB})
+    return await bin_op(ps_expr3(ctx), {Op.ADD, Op.SUB})
 
 @Parser.routine('expression')
 async def ps_expr5(ctx):
     return await bin_op(ps_expr4(ctx), {
-        OpToken.LT, OpToken.LE, OpToken.GT, OpToken.GE,
-        OpToken.EQ, OpToken.NE
+        Op.LT, Op.LE, Op.GT, Op.GE,
+        Op.EQ, Op.NE
     })
 
 @Parser.routine('expression')
 async def ps_expr6(ctx):
-    return await bin_op(ps_expr5(ctx), {OpToken.AND})
+    return await bin_op(ps_expr5(ctx), {Op.AND})
 
 @Parser.routine('expression')
 async def ps_expr(ctx):
-    return await bin_op(ps_expr6(ctx), {OpToken.OR})
+    return await bin_op(ps_expr6(ctx), {Op.OR})
 
 
 @Parser.routine('assignment')
@@ -251,8 +251,8 @@ async def ps_block(ctx):
 
 @Parser.routine('function declaration')
 async def ps_func():
-    if not (tp := await Instance(TypeToken)): return
-    if not (name := await Instance(IdentToken)): return
+    if not (tp := await Instance(Type)): return
+    if not (name := await Instance(Ident)): return
     if not await Exact(BracToken.LPAREN): return
 
     ret_type = DataType(tp.token)
