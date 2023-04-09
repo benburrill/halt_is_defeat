@@ -270,7 +270,7 @@ class FuncDeclaration(Statement):
     body: CodeBlock
 
 
-@dataclass
+@dataclass(frozen=True)
 class Program:
     var_decls: Sequence[Declaration]
     func_decls: Sequence[FuncDeclaration]

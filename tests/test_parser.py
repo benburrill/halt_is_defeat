@@ -342,6 +342,32 @@ def test_program():
     with raises(ParserError): parse_string('int x = @f(5);', ps_program())
     with raises(ParserError): parse_string('int x = !f(5);', ps_program())
 
+def test_hash_eq():
+    test = """
+        const byte[] arr = ['a', 'b', 'c'];
+        int x[42];
+        
+        void @is_you() {
+            x[0] = -arr[arr.length - 1] + 1;
+            try {
+                for (int i = 0; i < arr.length; i += 1) {
+                    if (true) {
+                        continue;
+                    } else {
+                        preempt {
+                            break;
+                        }
+                    }
+                }
+                !is_defeat();
+            } undo {
+                return;
+            }
+        }
+    """
+
+    assert {parse_string(test, ps_program())} == {parse_string(test, ps_program())}
+
 def test_weird_int_again():
     # Follow-up from lexer tests
     with raises(ParserError): parse_string('int x = 0_;', ps_program())
