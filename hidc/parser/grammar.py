@@ -210,14 +210,15 @@ async def ps_block(ctx):
         cond = await expect(ps_expr(ctx))
         await expect(Exact(BracToken.RPAREN))
         body = await expect(ps_block(ctx))
-        else_block = await Exact(BlockToken.ELSE) and await ps_block(ctx)
-        return IfBlock(start, body, cond, else_block)
+        if await Exact(BlockToken.ELSE):
+            return IfBlock(start, body, cond, await expect(ps_block(ctx)))
+        return IfBlock(start, body, cond, CodeBlock.empty(body.span.end))
     elif await Exact(BlockToken.WHILE):
         await expect(Exact(BracToken.LPAREN))
         cond = await expect(ps_expr(ctx))
         await expect(Exact(BracToken.RPAREN))
         body = await expect(ps_block(ctx | BlockContext.LOOP))
-        return LoopBlock(start, body, cond)
+        return LoopBlock.while_loop(start, body, cond)
     elif await Exact(BlockToken.FOR):
         await expect(Exact(BracToken.LPAREN))
         init = await ps_plain_stmt(ctx, allow_decl=True)

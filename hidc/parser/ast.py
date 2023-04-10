@@ -1,6 +1,5 @@
 from hidc.lexer.tokens import Op, Ident, Type
 from hidc.lexer.scanner import Span, Cursor
-import hidc.utils.propertyclasses as pc
 
 from collections.abc import Sequence
 import dataclasses as dc
@@ -203,19 +202,14 @@ class ControlBlock(Block):
         return self.body.span | self.start
 
 
-@pc.add_properties
 @dc.dataclass(frozen=True)
 class LoopBlock(ControlBlock):
     cond: Expression
-    _cont: Statement = pc.internal_field(default=None)
-    cont: CodeBlock = dc.field(init=False)
+    cont: CodeBlock
 
-    @pc.property_field
-    @property
-    def cont(self):
-        if self._cont is None:
-            return CodeBlock.empty(self.body.span.end)
-        return self._cont
+    @classmethod
+    def while_loop(cls, start, body, cond):
+        return cls(start, body, cond, CodeBlock.empty(start))
 
     @classmethod
     def for_loop(cls, start, body, init, cond, cont):
@@ -226,19 +220,10 @@ class LoopBlock(ControlBlock):
         ), Span(start, body.span.end))
 
 
-@pc.add_properties
 @dc.dataclass(frozen=True)
 class IfBlock(ControlBlock):
     cond: Expression
-    _else_block: Block = pc.internal_field(default=None)
-    else_block: Block = dc.field(init=False)
-
-    @pc.property_field
-    @property
-    def else_block(self):
-        if self._else_block is None:
-            return CodeBlock.empty(self.body.span.end)
-        return self._else_block
+    else_block: Block
 
 
 @dc.dataclass(frozen=True)
