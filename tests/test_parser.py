@@ -130,22 +130,25 @@ def test_func_flavor():
 
 def test_try():
     assert parse_string("""
+        try { preempt {} } undo {}
+    """, ps_block(yctx)) == TryBlock(
+        _, CodeBlock((
+            PreemptBlock(_, CodeBlock.empty(_)),
+        ), _),
+        UndoBlock(_, CodeBlock.empty(_))
+    ) == parse_string("""
         void @f() {
             try { preempt {} } undo {}
         }
-    """, ps_program()) == Program(
-        var_decls=(),
-        func_decls=(FuncDeclaration(
-            _, DataType(Type.VOID),
-            FuncSignature(Ident.you('f'), ()), CodeBlock((
-                TryBlock(
-                    _, CodeBlock((
-                        PreemptBlock(_, CodeBlock.empty(_)),
-                    ), _),
-                    UndoBlock(_, CodeBlock.empty(_))),
-            ), _)
-        ),)
-    )
+    """, ps_program()).func_decls[0].body.stmts[0]
+
+    with raises(ParserError): parse_string("""
+        try { preempt {} } 
+    """, ps_block(yctx))
+
+    with raises(ParserError): parse_string("""
+        try { preempt {} } undo
+    """, ps_block(yctx))
 
 def test_out_of_place():
     with raises(ParserError): parse_string("""
@@ -307,6 +310,12 @@ def test_else():
         )
     )
 
+    with raises(ParserError): parse_string("""
+        if (a) {
+            1;
+        } else
+    """, ps_block(ctx))
+
 def test_while():
     assert parse_string("""
         while (true) {
@@ -317,6 +326,7 @@ def test_while():
         }
     """, ps_block(ctx)) == LoopBlock.while_loop(
         start=_,
+        cond=BoolLiteral(True, _),
         body=CodeBlock((
             IfBlock(
                 start=_,
@@ -325,8 +335,7 @@ def test_while():
                 else_block=CodeBlock.empty(_)
             ),
             BreakStatement(_),
-        ), _),
-        cond=BoolLiteral(True, _)
+        ), _)
     )
 
 def test_block():
