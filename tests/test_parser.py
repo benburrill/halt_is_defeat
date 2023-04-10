@@ -206,6 +206,7 @@ def test_return():
     )
 
 def test_for():
+    # We cannot use LoopBlock.for_loop, since it expects an actual span
     assert parse_string("""
         for (int i = 0; i < arr.length; i += 1) {
             arr[i] = 0;
@@ -216,16 +217,19 @@ def test_for():
             IntLiteral(0, _), _
         ),
         LoopBlock(
-            _, CodeBlock((
+            start=_,
+            cond=BinaryOp(
+                Op.LT, _,
+                VariableLookup('i', _),
+                LengthLookup(VariableLookup('arr', _), _)
+            ),
+            body=CodeBlock((
                 Assignment(
                     ArrayLookup(VariableLookup('arr', _), VariableLookup('i', _), _),
                     IntLiteral(0, _)
                 ),
             ),_),
-            BinaryOp(Op.LT, _,
-                     VariableLookup('i', _),
-                     LengthLookup(VariableLookup('arr', _), _)),
-            CodeBlock((
+            cont=CodeBlock((
                 IncAssignment(VariableLookup('i', _), IntLiteral(1, _), Op.ADD),
             ), _)
         )
@@ -259,18 +263,20 @@ def test_if():
             println("potato");
         }
     """, ps_block(ctx)) == IfBlock(
-        _, CodeBlock((
+        start=_,
+        cond=BinaryOp(
+            Op.OR, _,
+            BinaryOp(Op.EQ, _, VariableLookup('x', _),
+                     IntLiteral(1, _)),
+            BinaryOp(Op.EQ, _, VariableLookup('y', _), IntLiteral(2, _))
+        ),
+        body=CodeBlock((
             FuncCall(
                 Ident('println'),
                 (StringLiteral(b'potato', _),), _
             ),
         ), _),
-        BinaryOp(
-            Op.OR, _,
-            BinaryOp(Op.EQ, _, VariableLookup('x', _), IntLiteral(1, _)),
-            BinaryOp(Op.EQ, _, VariableLookup('y', _), IntLiteral(2, _))
-        ),
-        CodeBlock.empty(_)
+        else_block=CodeBlock.empty(_)
     )
 
 def test_else():
@@ -285,15 +291,18 @@ def test_else():
             4;
         }
     """, ps_block(ctx)) == IfBlock(
-        _, CodeBlock((IntLiteral(1, _),),_),
-        VariableLookup('a', _),
-        IfBlock(
-            _, CodeBlock((IntLiteral(2, _),), _),
-            VariableLookup('b', _),
-            IfBlock(
-                _, CodeBlock((IntLiteral(3, _),), _),
-                VariableLookup('c', _),
-                CodeBlock((IntLiteral(4, _),), _)
+        start=_,
+        cond=VariableLookup('a', _),
+        body=CodeBlock((IntLiteral(1, _),),_),
+        else_block=IfBlock(
+            start=_,
+            cond=VariableLookup('b', _),
+            body=CodeBlock((IntLiteral(2, _),), _),
+            else_block=IfBlock(
+                start=_,
+                cond=VariableLookup('c', _),
+                body=CodeBlock((IntLiteral(3, _),), _),
+                else_block=CodeBlock((IntLiteral(4, _),), _)
             )
         )
     )
@@ -306,16 +315,18 @@ def test_while():
             }
             break;
         }
-    """, ps_block(ctx)) == LoopBlock(
-        _, CodeBlock((
+    """, ps_block(ctx)) == LoopBlock.while_loop(
+        start=_,
+        body=CodeBlock((
             IfBlock(
-                _, CodeBlock((ContinueStatement(_),), _),
-                BoolLiteral(False,_),
-                CodeBlock.empty(_)
+                start=_,
+                cond=BoolLiteral(False, _),
+                body=CodeBlock((ContinueStatement(_),), _),
+                else_block=CodeBlock.empty(_)
             ),
             BreakStatement(_),
         ), _),
-        BoolLiteral(True, _), CodeBlock.empty(_)
+        cond=BoolLiteral(True, _)
     )
 
 def test_block():
