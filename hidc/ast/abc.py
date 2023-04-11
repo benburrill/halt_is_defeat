@@ -10,7 +10,11 @@ class Block(Statement):
 
 
 class Expression(Statement):
-    pass
+    concrete = False
+
+
+class PrimitiveValue(Expression):
+    concrete = True
 
 
 class Assignable(Expression):

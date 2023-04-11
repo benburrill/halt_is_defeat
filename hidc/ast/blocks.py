@@ -1,5 +1,5 @@
 from . import abc
-from .expressions import BoolLiteral
+from .expressions import BoolValue
 from hidc.lexer import Span, Cursor
 
 import dataclasses as dc
@@ -39,7 +39,7 @@ class LoopBlock(ControlBlock):
     def for_loop(cls, start, body, init, cond, cont):
         return CodeBlock((
             init or CodeBlock.empty(start),
-            cls(start, body, cond or BoolLiteral(True, start),
+            cls(start, body, cond or BoolValue(True, start),
                 cont and CodeBlock((cont,), cont.span))
         ), Span(start, body.span.end))
 

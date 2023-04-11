@@ -29,22 +29,22 @@ _: ty.Any = Any(Span | Cursor)
 def test_declaration():
     assert parse_string('int x = 42', ps_vdecl(ctx)) == Declaration(
         Variable(const=False, type=DataType(Type.INT), name='x'),
-        IntLiteral(42, _), _
+        IntValue(42, _), _
     )
 
     assert parse_string("const byte x = 'B'", ps_vdecl(ctx)) == Declaration(
         Variable(const=True, type=DataType(Type.BYTE), name='x'),
-        ByteLiteral(ord('B'), _), _
+        ByteValue(ord('B'), _), _
     )
 
     assert parse_string('bool x[5]', ps_vdecl(ctx)) == Declaration(
         Variable(const=False, type=ArrayType(Type.BOOL), name='x'),
-        ArrayInitializer(ArrayType(Type.BOOL), IntLiteral(5, _)), _
+        ArrayInitializer(ArrayType(Type.BOOL), IntValue(5, _)), _
     )
 
     assert parse_string('int[] x = [1, 2, 3]', ps_vdecl(ctx)) == Declaration(
         Variable(const=False, type=ArrayType(Type.INT), name='x'),
-        ArrayLiteral((IntLiteral(1, _), IntLiteral(2, _), IntLiteral(3, _)), _), _
+        ArrayLiteral((IntValue(1, _), IntValue(2, _), IntValue(3, _)), _), _
     )
 
     with raises(ParserError): parse_string('int x', ps_vdecl(ctx))
@@ -58,22 +58,22 @@ def test_declaration():
     with raises(ParserError): parse_string('int x[int x = 5]', ps_vdecl(ctx))
 
 def test_literal():
-    assert parse_string('42', ps_expr(ctx)) == IntLiteral(42, _)
-    assert parse_string(r"'\x42'", ps_expr(ctx)) == ByteLiteral(0x42, _)
-    assert parse_string('"hi"', ps_expr(ctx)) == StringLiteral(b'hi', _)
-    assert parse_string('true', ps_expr(ctx)) == BoolLiteral(True, _)
+    assert parse_string('42', ps_expr(ctx)) == IntValue(42, _)
+    assert parse_string(r"'\x42'", ps_expr(ctx)) == ByteValue(0x42, _)
+    assert parse_string('"hi"', ps_expr(ctx)) == StringValue(b'hi', _)
+    assert parse_string('true', ps_expr(ctx)) == BoolValue(True, _)
 
     assert parse_string('[]', ps_expr(ctx)) == ArrayLiteral((), _)
     assert parse_string('[1]', ps_expr(ctx)) == ArrayLiteral(
-        (IntLiteral(1, _),), _
+        (IntValue(1, _),), _
     )
 
     assert parse_string('[1,2]', ps_expr(ctx)) == ArrayLiteral(
-        (IntLiteral(1, _), IntLiteral(2, _)), _
+        (IntValue(1, _), IntValue(2, _)), _
     )
 
     assert parse_string('[1,2,3]', ps_expr(ctx)) == ArrayLiteral(
-        (IntLiteral(1, _), IntLiteral(2, _), IntLiteral(3, _)), _
+        (IntValue(1, _), IntValue(2, _), IntValue(3, _)), _
     )
 
     with raises(ParserError): parse_string('[1,2', ps_expr(ctx))
@@ -84,25 +84,25 @@ def test_literal():
 def test_precedence():
     assert parse_string('1 + 2 + 3', ps_expr(ctx)) == BinaryOp(
         Op.ADD, _,
-        BinaryOp(Op.ADD, _, IntLiteral(1, _), IntLiteral(2, _)),
-        IntLiteral(3, _)
+        BinaryOp(Op.ADD, _, IntValue(1, _), IntValue(2, _)),
+        IntValue(3, _)
     )
 
     assert parse_string('1 + (2 + 3)', ps_expr(ctx)) == BinaryOp(
         Op.ADD, _,
-        IntLiteral(1, _),
-        BinaryOp(Op.ADD, _, IntLiteral(2, _), IntLiteral(3, _))
+        IntValue(1, _),
+        BinaryOp(Op.ADD, _, IntValue(2, _), IntValue(3, _))
     )
 
     assert parse_string('1 + 2 * 3', ps_expr(ctx)) == BinaryOp(
         Op.ADD, _,
-        IntLiteral(1, _),
-        BinaryOp(Op.MUL, _, IntLiteral(2, _), IntLiteral(3, _))
+        IntValue(1, _),
+        BinaryOp(Op.MUL, _, IntValue(2, _), IntValue(3, _))
     )
 
     assert parse_string('1 + -2', ps_expr(ctx)) == BinaryOp(
-        Op.ADD, _, IntLiteral(1, _),
-        UnaryOp(Op.SUB, _, IntLiteral(2, _))
+        Op.ADD, _, IntValue(1, _),
+        UnaryOp(Op.SUB, _, IntValue(2, _))
     )
 
 def test_func_flavor():
@@ -201,7 +201,7 @@ def test_return():
             CodeBlock((ReturnStatement(
                 _, BinaryOp(
                     Op.ADD, _,
-                    VariableLookup('x', _), IntLiteral(1, _)
+                    VariableLookup('x', _), IntValue(1, _)
                 )
             ),), _)
         ),)
@@ -216,7 +216,7 @@ def test_for():
     """, ps_block(ctx)) == CodeBlock((
         Declaration(
             Variable(const=False, type=DataType(Type.INT), name='i'),
-            IntLiteral(0, _), _
+            IntValue(0, _), _
         ),
         LoopBlock(
             start=_,
@@ -228,11 +228,11 @@ def test_for():
             body=CodeBlock((
                 Assignment(
                     ArrayLookup(VariableLookup('arr', _), VariableLookup('i', _), _),
-                    IntLiteral(0, _)
+                    IntValue(0, _)
                 ),
             ),_),
             cont=CodeBlock((
-                IncAssignment(VariableLookup('i', _), IntLiteral(1, _), Op.ADD),
+                IncAssignment(VariableLookup('i', _), IntValue(1, _), Op.ADD),
             ), _)
         )
     ), _)
@@ -269,13 +269,13 @@ def test_if():
         cond=BinaryOp(
             Op.OR, _,
             BinaryOp(Op.EQ, _, VariableLookup('x', _),
-                     IntLiteral(1, _)),
-            BinaryOp(Op.EQ, _, VariableLookup('y', _), IntLiteral(2, _))
+                     IntValue(1, _)),
+            BinaryOp(Op.EQ, _, VariableLookup('y', _), IntValue(2, _))
         ),
         body=CodeBlock((
             FuncCall(
                 Ident('println'),
-                (StringLiteral(b'potato', _),), _
+                (StringValue(b'potato', _),), _
             ),
         ), _),
         else_block=CodeBlock.empty(_)
@@ -295,16 +295,16 @@ def test_else():
     """, ps_block(ctx)) == IfBlock(
         start=_,
         cond=VariableLookup('a', _),
-        body=CodeBlock((IntLiteral(1, _),),_),
+        body=CodeBlock((IntValue(1, _),), _),
         else_block=IfBlock(
             start=_,
             cond=VariableLookup('b', _),
-            body=CodeBlock((IntLiteral(2, _),), _),
+            body=CodeBlock((IntValue(2, _),), _),
             else_block=IfBlock(
                 start=_,
                 cond=VariableLookup('c', _),
-                body=CodeBlock((IntLiteral(3, _),), _),
-                else_block=CodeBlock((IntLiteral(4, _),), _)
+                body=CodeBlock((IntValue(3, _),), _),
+                else_block=CodeBlock((IntValue(4, _),), _)
             )
         )
     )
@@ -325,11 +325,11 @@ def test_while():
         }
     """, ps_block(ctx)) == LoopBlock.while_loop(
         start=_,
-        cond=BoolLiteral(True, _),
+        cond=BoolValue(True, _),
         body=CodeBlock((
             IfBlock(
                 start=_,
-                cond=BoolLiteral(False, _),
+                cond=BoolValue(False, _),
                 body=CodeBlock((ContinueStatement(_),), _),
                 else_block=CodeBlock.empty(_)
             ),
@@ -343,7 +343,7 @@ def test_block():
     assert parse_string('{int x = 0;}', ps_block(ctx)) == CodeBlock((
         Declaration(
             Variable(const=False, type=DataType(Type.INT), name='x'),
-            IntLiteral(0, _), _
+            IntValue(0, _), _
         ),
     ), _)
 
@@ -359,7 +359,7 @@ def test_program():
     """, ps_program()) == Program(
         var_decls=(Declaration(
             Variable(const=False, type=DataType(Type.INT), name='x'),
-            UnaryOp(Op.SUB, _, IntLiteral(5, _)), _
+            UnaryOp(Op.SUB, _, IntValue(5, _)), _
         ),),
         func_decls=(FuncDeclaration(
             _, DataType(Type.VOID),

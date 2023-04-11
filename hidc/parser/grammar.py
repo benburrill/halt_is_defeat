@@ -94,13 +94,13 @@ async def ps_expr0(ctx):
         await expect(Exact(BracToken.RPAREN))
         return expr
     elif lit := await Instance(IntToken):
-        return IntLiteral(lit.token.data, lit.span)
+        return IntValue(lit.token.data, lit.span)
     elif lit := await Instance(CharToken):
-        return ByteLiteral(lit.token.data, lit.span)
+        return ByteValue(lit.token.data, lit.span)
     elif lit := await Instance(StringToken):
-        return StringLiteral(lit.token.data, lit.span)
+        return StringValue(lit.token.data, lit.span)
     elif lit := await Instance(BoolToken):
-        return BoolLiteral(lit.token.data, lit.span)
+        return BoolValue(lit.token.data, lit.span)
     elif start := await Exact(BracToken.LSQUARE):
         items = await comma_list(ps_expr(ctx))
         end = await expect(Exact(BracToken.RSQUARE))

@@ -31,23 +31,23 @@ class UnaryOp(abc.Expression):
 
 
 @dc.dataclass(frozen=True)
-class IntLiteral(abc.Expression):
+class IntValue(abc.PrimitiveValue):
     data: int
     span: Span
 
 
-class ByteLiteral(IntLiteral):
+class ByteValue(IntValue):
     pass
 
 
 @dc.dataclass(frozen=True)
-class StringLiteral(abc.Expression):
+class StringValue(abc.PrimitiveValue):
     data: bytes
     span: Span
 
 
 @dc.dataclass(frozen=True)
-class BoolLiteral(abc.Expression):
+class BoolValue(abc.PrimitiveValue):
     data: bool
     span: Span
 
@@ -59,7 +59,11 @@ class ArrayLiteral(abc.Expression):
 
     @property
     def length(self):
-        return IntLiteral(len(self.values), self.span)
+        return IntValue(len(self.values), self.span)
+
+    @property
+    def concrete(self):
+        return all(val.concrete for val in self.values)
 
 
 # Not really an expression, but let's pretend:
