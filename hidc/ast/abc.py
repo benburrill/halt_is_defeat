@@ -1,8 +1,8 @@
 from hidc.lexer import Span
-from abc import ABC
+from hidc.utils.data_abc import DataABC, Abstract
 
-class Statement(ABC):
-    span: Span
+class Statement(DataABC):
+    span: Abstract[Span]
 
 
 class Block(Statement):
