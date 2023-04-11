@@ -17,7 +17,6 @@ class DataABCMeta(ABCMeta):
                 if not hasattr(cls, field):
                     abstract |= {field}
                 elif not getattr(getattr(cls, field), '__isabstractmethod__', False):
-                    cls.__annotations__[field] = anno.__origin__
                     abstract -= {field}
             elif field in abstract and not hasattr(cls, field):
                 abstract -= {field}
