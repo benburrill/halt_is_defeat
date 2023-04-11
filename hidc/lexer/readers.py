@@ -1,5 +1,5 @@
 import re
-from hidc.lexer import tokens
+from . import tokens
 from hidc.errors import LexerError
 
 

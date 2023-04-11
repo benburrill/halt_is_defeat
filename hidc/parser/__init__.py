@@ -1,9 +1,9 @@
+from . import rules
+from .grammar import ps_program
+
 from hidc.utils.lazylist import lazy_list
 from hidc.errors import ParserError
 from hidc.lexer import lex
-
-from hidc.parser import rules
-from hidc.parser.grammar import ps_program
 
 
 def parse(source, rule=ps_program(), partial=False):

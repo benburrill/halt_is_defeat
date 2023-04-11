@@ -1,4 +1,4 @@
-from hidc.lexer.scanner import Span
+from hidc.lexer import Span
 from abc import ABC
 
 class Statement(ABC):

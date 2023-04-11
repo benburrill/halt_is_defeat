@@ -3,8 +3,8 @@ from .symbols import Variable
 
 import dataclasses as dc
 
+from hidc.lexer import Span, Cursor
 from hidc.lexer.tokens import Op
-from hidc.lexer.scanner import Span, Cursor
 
 
 @dc.dataclass(frozen=True)

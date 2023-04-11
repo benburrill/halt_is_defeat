@@ -1,7 +1,7 @@
 from . import abc
 from .symbols import *
+from hidc.lexer import Span, Cursor
 from hidc.lexer.tokens import Op
-from hidc.lexer.scanner import Span, Cursor
 
 import dataclasses as dc
 from collections.abc import Sequence

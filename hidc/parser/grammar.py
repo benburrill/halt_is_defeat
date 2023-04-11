@@ -1,4 +1,4 @@
-from hidc.parser.rules import *
+from .rules import *
 from hidc.lexer.tokens import *
 from hidc.ast import *
 from hidc.errors import ParserError

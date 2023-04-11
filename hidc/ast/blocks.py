@@ -1,6 +1,6 @@
 from . import abc
 from .expressions import BoolLiteral
-from hidc.lexer.scanner import Span, Cursor
+from hidc.lexer import Span, Cursor
 
 import dataclasses as dc
 from collections.abc import Sequence

@@ -1,6 +1,6 @@
-from hidc.lexer import tokens
-from hidc.lexer import readers
-from hidc.lexer.scanner import Scanner, Span, Cursor, SourceCode
+from . import tokens
+from . import readers
+from .scanner import Scanner, Span, Cursor, SourceCode
 from hidc.errors import LexerError
 
 import dataclasses as dc
