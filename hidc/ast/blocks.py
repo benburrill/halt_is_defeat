@@ -7,22 +7,13 @@ from collections.abc import Sequence
 
 
 @dc.dataclass(frozen=True)
-class CodeBlock(abc.Block, Sequence):
+class CodeBlock(abc.Block):
     stmts: Sequence[abc.Statement]
     span: Span
 
     @classmethod
     def empty(cls, cursor):
         return cls((), Span(cursor, cursor))
-
-    def __getitem__(self, item):
-        return self.stmts[item]
-
-    def __len__(self):
-        return len(self.stmts)
-
-    def __bool__(self):
-        return True
 
 
 @dc.dataclass(frozen=True)
