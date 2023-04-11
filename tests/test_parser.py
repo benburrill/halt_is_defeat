@@ -1,5 +1,5 @@
+from hidc.ast import *
 from hidc.parser.grammar import *
-from hidc.parser.ast import *
 from hidc.parser.rules import expect
 from hidc.parser import parse, ParserError
 from hidc.lexer import SourceCode, Span, Cursor

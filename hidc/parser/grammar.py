@@ -1,6 +1,6 @@
 from hidc.parser.rules import *
 from hidc.lexer.tokens import *
-from hidc.parser.ast import *
+from hidc.ast import *
 from hidc.errors import ParserError
 
 import enum
