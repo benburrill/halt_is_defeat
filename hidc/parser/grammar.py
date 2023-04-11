@@ -93,8 +93,10 @@ async def ps_expr0(ctx):
         expr = await expect(ps_expr(ctx))
         await expect(Exact(BracToken.RPAREN))
         return expr
-    elif lit := await Instance(IntToken | CharToken):
+    elif lit := await Instance(IntToken):
         return IntLiteral(lit.token.data, lit.span)
+    elif lit := await Instance(CharToken):
+        return ByteLiteral(lit.token.data, lit.span)
     elif lit := await Instance(StringToken):
         return StringLiteral(lit.token.data, lit.span)
     elif lit := await Instance(BoolToken):

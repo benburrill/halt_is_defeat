@@ -34,7 +34,7 @@ def test_declaration():
 
     assert parse_string("const byte x = 'B'", ps_vdecl(ctx)) == Declaration(
         Variable(const=True, type=DataType(Type.BYTE), name='x'),
-        IntLiteral(ord('B'), _), _
+        ByteLiteral(ord('B'), _), _
     )
 
     assert parse_string('bool x[5]', ps_vdecl(ctx)) == Declaration(
@@ -59,8 +59,7 @@ def test_declaration():
 
 def test_literal():
     assert parse_string('42', ps_expr(ctx)) == IntLiteral(42, _)
-    assert (parse_string('0x42', ps_expr(ctx)) == IntLiteral(0x42, _) ==
-            parse_string(r"'\x42'", ps_expr(ctx)))
+    assert parse_string(r"'\x42'", ps_expr(ctx)) == ByteLiteral(0x42, _)
     assert parse_string('"hi"', ps_expr(ctx)) == StringLiteral(b'hi', _)
     assert parse_string('true', ps_expr(ctx)) == BoolLiteral(True, _)
 

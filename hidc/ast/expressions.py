@@ -36,6 +36,10 @@ class IntLiteral(abc.Expression):
     span: Span
 
 
+class ByteLiteral(IntLiteral):
+    pass
+
+
 @dc.dataclass(frozen=True)
 class StringLiteral(abc.Expression):
     data: bytes
