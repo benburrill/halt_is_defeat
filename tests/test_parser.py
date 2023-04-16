@@ -28,22 +28,22 @@ _: ty.Any = Any(Span | Cursor)
 
 def test_declaration():
     assert parse_string('int x = 42', ps_vdecl(ctx)) == Declaration(
-        Variable(const=False, type=DataType(Type.INT), name='x'),
+        Variable(const=False, type=DataType.INT, name='x'),
         IntValue(42, _), _
     )
 
     assert parse_string("const byte x = 'B'", ps_vdecl(ctx)) == Declaration(
-        Variable(const=True, type=DataType(Type.BYTE), name='x'),
+        Variable(const=True, type=DataType.BYTE, name='x'),
         ByteValue(ord('B'), _), _
     )
 
     assert parse_string('bool x[5]', ps_vdecl(ctx)) == Declaration(
-        Variable(const=False, type=ArrayType(Type.BOOL), name='x'),
-        ArrayInitializer(ArrayType(Type.BOOL), IntValue(5, _)), _
+        Variable(const=False, type=ArrayType(DataType.BOOL), name='x'),
+        ArrayInitializer(ArrayType(DataType.BOOL), IntValue(5, _)), _
     )
 
     assert parse_string('int[] x = [1, 2, 3]', ps_vdecl(ctx)) == Declaration(
-        Variable(const=False, type=ArrayType(Type.INT), name='x'),
+        Variable(const=False, type=ArrayType(DataType.INT), name='x'),
         ArrayLiteral((IntValue(1, _), IntValue(2, _), IntValue(3, _)), _), _
     )
 
@@ -194,9 +194,9 @@ def test_return():
     """, ps_program()) == Program(
         var_decls=(),
         func_decls=(FuncDeclaration(
-            _, DataType(Type.INT), FuncSignature(
+            _, DataType.INT, FuncSignature(
                 Ident('f'),
-                (Variable(const=False, type=DataType(Type.INT), name='x'),)
+                (Variable(const=False, type=DataType.INT, name='x'),)
             ),
             CodeBlock((ReturnStatement(
                 _, BinaryOp(
@@ -215,7 +215,7 @@ def test_for():
         }
     """, ps_block(ctx)) == CodeBlock((
         Declaration(
-            Variable(const=False, type=DataType(Type.INT), name='i'),
+            Variable(const=False, type=DataType.INT, name='i'),
             IntValue(0, _), _
         ),
         LoopBlock(
@@ -342,7 +342,7 @@ def test_block():
     assert parse_string('{ ; }', ps_block(ctx)) == CodeBlock((), _)
     assert parse_string('{int x = 0;}', ps_block(ctx)) == CodeBlock((
         Declaration(
-            Variable(const=False, type=DataType(Type.INT), name='x'),
+            Variable(const=False, type=DataType.INT, name='x'),
             IntValue(0, _), _
         ),
     ), _)
@@ -358,11 +358,11 @@ def test_program():
         void @is_you() {}
     """, ps_program()) == Program(
         var_decls=(Declaration(
-            Variable(const=False, type=DataType(Type.INT), name='x'),
+            Variable(const=False, type=DataType.INT, name='x'),
             UnaryOp(Op.SUB, _, IntValue(5, _)), _
         ),),
         func_decls=(FuncDeclaration(
-            _, DataType(Type.VOID),
+            _, DataType.VOID,
             FuncSignature(Ident.you('is_you'), ()),
             CodeBlock.empty(_)
         ),)

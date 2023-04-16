@@ -150,7 +150,7 @@ class BlockToken(EnumToken):
 
 
 @include_enum
-class Type(EnumToken):
+class DataType(EnumToken):
     INT = 'int'
     BOOL = 'bool'
     BYTE = 'byte'

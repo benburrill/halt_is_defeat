@@ -32,3 +32,6 @@ class ParserError(CompilerError):
             )
 
         return cls(f'Expected {need}, found end of file', node.value)
+
+class TypeCheckError(CompilerError):
+    pass

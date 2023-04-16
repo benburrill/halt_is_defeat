@@ -95,7 +95,7 @@ def test_large():
             }
         }
     ''') == [
-        Type.VOID, Ident.you('is_you'),
+        DataType.VOID, Ident.you('is_you'),
         BracToken.LPAREN, BracToken.RPAREN, BracToken.LCURLY,
             BlockToken.IF, BracToken.LPAREN, BoolToken.TRUE, BracToken.RPAREN, BracToken.LCURLY,
                 Ident('println'), BracToken.LPAREN,

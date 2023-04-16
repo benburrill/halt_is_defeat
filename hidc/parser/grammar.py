@@ -9,11 +9,11 @@ from functools import cached_property
 
 @Parser.routine('variable type')
 async def ps_vtype():
-    if (tp := await Instance(Type)) and tp.token != Type.VOID:
+    if (tp := await Instance(DataType)) and tp.token != DataType.VOID:
         if await Exact(BracToken.LSQUARE):
             await expect(Exact(BracToken.RSQUARE))
             return ArrayType(tp.token)
-        return DataType(tp.token)
+        return tp.token
 
 
 @Parser.routine('identifier')
@@ -250,11 +250,11 @@ async def ps_block(ctx):
 
 @Parser.routine('function declaration')
 async def ps_func():
-    if not (tp := await Instance(Type)): return
+    if not (tp := await Instance(DataType)): return
     if not (name := await Instance(Ident)): return
     if not await Exact(BracToken.LPAREN): return
 
-    ret_type = DataType(tp.token)
+    ret_type = tp.token
     if name.token.flavor == Flavor.YOU:
         ctx = BlockContext.YOU
     elif name.token.flavor == Flavor.DEFEAT:
