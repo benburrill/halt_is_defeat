@@ -50,7 +50,7 @@ async def ps_vdecl(ctx):
                 raise ParserError('VLAs should not be declared const', start)
             elif isinstance(var.type, ArrayType):
                 raise ParserError('Unexpected [', brac.span)
-            dt = ArrayType(var.type.token)
+            dt = ArrayType(var.type)
             init = ArrayInitializer(dt, await expect(ps_expr(ctx)))
             await expect(Exact(BracToken.RSQUARE))
             return Declaration(Variable(False, dt, var.name), init, start)

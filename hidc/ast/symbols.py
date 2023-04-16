@@ -6,10 +6,6 @@ import enum
 import dataclasses as dc
 from collections.abc import Sequence
 
-@dc.dataclass(frozen=True)
-class DataType:
-    token: Type
-
 
 class Access(enum.Flag):
     RD = 0  # Readable
