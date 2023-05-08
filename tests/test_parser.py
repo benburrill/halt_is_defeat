@@ -28,22 +28,22 @@ _: ty.Any = Any(Span | Cursor)
 
 def test_declaration():
     assert parse_string('int x = 42', ps_vdecl(ctx)) == Declaration(
-        Variable(const=False, type=DataType.INT, name='x'),
+        Variable('x', DataType.INT, const=False),
         IntValue(42, _), _
     )
 
     assert parse_string("const byte x = 'B'", ps_vdecl(ctx)) == Declaration(
-        Variable(const=True, type=DataType.BYTE, name='x'),
+        Variable('x', DataType.BYTE, const=True),
         ByteValue(ord('B'), _), _
     )
 
     assert parse_string('bool x[5]', ps_vdecl(ctx)) == Declaration(
-        Variable(const=False, type=ArrayType(DataType.BOOL), name='x'),
-        ArrayInitializer(ArrayType(DataType.BOOL), IntValue(5, _)), _
+        Variable('x', ArrayType(DataType.BOOL, const=False), const=True),
+        ArrayInitializer(ArrayType(DataType.BOOL, const=False), IntValue(5, _)), _
     )
 
     assert parse_string('int[] x = [1, 2, 3]', ps_vdecl(ctx)) == Declaration(
-        Variable(const=False, type=ArrayType(DataType.INT), name='x'),
+        Variable('x', ArrayType(DataType.INT, const=False), const=True),
         ArrayLiteral((IntValue(1, _), IntValue(2, _), IntValue(3, _)), _), _
     )
 
@@ -52,7 +52,7 @@ def test_declaration():
     with raises(ParserError): parse_string('aint x = 5', ps_vdecl(ctx))
     with raises(ParserError): parse_string('int @x = 5', ps_vdecl(ctx))
     with raises(ParserError): parse_string('int x = int x = 5', ps_vdecl(ctx))
-    with raises(ParserError): parse_string('const int x[5]', ps_vdecl(ctx))
+    # with raises(ParserError): parse_string('const int x[5]', ps_vdecl(ctx))
     with raises(ParserError): parse_string('int[] x[5]', ps_vdecl(ctx))
     with raises(ParserError): parse_string('int x[5', ps_vdecl(ctx))
     with raises(ParserError): parse_string('int x[int x = 5]', ps_vdecl(ctx))
@@ -107,18 +107,18 @@ def test_precedence():
 
 def test_func_flavor():
     assert (
-        parse_string('f(x)', ps_expr(ctx)) ==
-        parse_string('f(x)', ps_expr(yctx)) ==
-        parse_string('f(x)', ps_expr(dctx)) ==
-        FuncCall(Ident('f'), (VariableLookup('x', _),), _)
+            parse_string('f(x)', ps_expr(ctx)) ==
+            parse_string('f(x)', ps_expr(yctx)) ==
+            parse_string('f(x)', ps_expr(dctx)) ==
+            FuncCall(Ident('f'), (VariableLookup(UnresolvedName('x'), _),), _)
     )
 
     assert parse_string('!f(x)', ps_expr(dctx)) == FuncCall(
-        Ident.defeat('f'), (VariableLookup('x', _),), _
+        Ident.defeat('f'), (VariableLookup(UnresolvedName('x'), _),), _
     )
 
     assert parse_string('@f(x)', ps_expr(yctx)) == FuncCall(
-        Ident.you('f'), (VariableLookup('x', _),), _
+        Ident.you('f'), (VariableLookup(UnresolvedName('x'), _),), _
     )
 
     with raises(ParserError): parse_string('!f(x)', ps_expr(ctx))
@@ -194,14 +194,13 @@ def test_return():
     """, ps_program()) == Program(
         var_decls=(),
         func_decls=(FuncDeclaration(
-            _, DataType.INT, FuncSignature(
-                Ident('f'),
-                (Variable(const=False, type=DataType.INT, name='x'),)
+            _, DataType.INT, Ident('f'), (
+                Parameter(Variable('x', DataType.INT, const=False),_),
             ),
             CodeBlock((ReturnStatement(
                 _, BinaryOp(
                     Op.ADD, _,
-                    VariableLookup('x', _), IntValue(1, _)
+                    VariableLookup(UnresolvedName('x'), _), IntValue(1, _)
                 )
             ),), _)
         ),)
@@ -215,24 +214,31 @@ def test_for():
         }
     """, ps_block(ctx)) == CodeBlock((
         Declaration(
-            Variable(const=False, type=DataType.INT, name='i'),
+            Variable('i', DataType.INT, const=False),
             IntValue(0, _), _
         ),
         LoopBlock(
             start=_,
             cond=BinaryOp(
                 Op.LT, _,
-                VariableLookup('i', _),
-                LengthLookup(VariableLookup('arr', _), _)
+                VariableLookup(UnresolvedName('i'), _),
+                LengthLookup(VariableLookup(UnresolvedName('arr'), _), _)
             ),
             body=CodeBlock((
                 Assignment(
-                    ArrayLookup(VariableLookup('arr', _), VariableLookup('i', _), _),
+                    ArrayLookup(
+                        VariableLookup(UnresolvedName('arr'), _),
+                        VariableLookup(UnresolvedName('i'), _), _
+                    ),
                     IntValue(0, _)
                 ),
             ),_),
             cont=CodeBlock((
-                IncAssignment(VariableLookup('i', _), IntValue(1, _), Op.ADD),
+                IncAssignment(
+                    VariableLookup(UnresolvedName('i'), _),
+                    IntValue(1, _),
+                    Op.ADD
+                ),
             ), _)
         )
     ), _)
@@ -268,9 +274,10 @@ def test_if():
         start=_,
         cond=BinaryOp(
             Op.OR, _,
-            BinaryOp(Op.EQ, _, VariableLookup('x', _),
+            BinaryOp(Op.EQ, _, VariableLookup(UnresolvedName('x'), _),
                      IntValue(1, _)),
-            BinaryOp(Op.EQ, _, VariableLookup('y', _), IntValue(2, _))
+            BinaryOp(Op.EQ, _, VariableLookup(UnresolvedName('y'), _),
+                     IntValue(2, _))
         ),
         body=CodeBlock((
             FuncCall(
@@ -294,15 +301,15 @@ def test_else():
         }
     """, ps_block(ctx)) == IfBlock(
         start=_,
-        cond=VariableLookup('a', _),
+        cond=VariableLookup(UnresolvedName('a'), _),
         body=CodeBlock((IntValue(1, _),), _),
         else_block=IfBlock(
             start=_,
-            cond=VariableLookup('b', _),
+            cond=VariableLookup(UnresolvedName('b'), _),
             body=CodeBlock((IntValue(2, _),), _),
             else_block=IfBlock(
                 start=_,
-                cond=VariableLookup('c', _),
+                cond=VariableLookup(UnresolvedName('c'), _),
                 body=CodeBlock((IntValue(3, _),), _),
                 else_block=CodeBlock((IntValue(4, _),), _)
             )
@@ -342,7 +349,7 @@ def test_block():
     assert parse_string('{ ; }', ps_block(ctx)) == CodeBlock((), _)
     assert parse_string('{int x = 0;}', ps_block(ctx)) == CodeBlock((
         Declaration(
-            Variable(const=False, type=DataType.INT, name='x'),
+            Variable('x', DataType.INT, const=False),
             IntValue(0, _), _
         ),
     ), _)
@@ -358,12 +365,11 @@ def test_program():
         void @is_you() {}
     """, ps_program()) == Program(
         var_decls=(Declaration(
-            Variable(const=False, type=DataType.INT, name='x'),
+            Variable('x', DataType.INT, const=False),
             UnaryOp(Op.SUB, _, IntValue(5, _)), _
         ),),
         func_decls=(FuncDeclaration(
-            _, DataType.VOID,
-            FuncSignature(Ident.you('is_you'), ()),
+            _, DataType.VOID, Ident.you('is_you'), (),
             CodeBlock.empty(_)
         ),)
     )

@@ -7,12 +7,8 @@ import enum
 from functools import cached_property
 
 
-@Parser.routine('variable type')
-async def ps_vtype():
+async def ps_data_type():
     if (tp := await Instance(DataType)) and tp.token != DataType.VOID:
-        if await Exact(BracToken.LSQUARE):
-            await expect(Exact(BracToken.RSQUARE))
-            return ArrayType(tp.token)
         return tp.token
 
 
@@ -32,9 +28,13 @@ async def ps_ident(allowed_flavors):
 @Parser.routine('declaration')
 async def ps_decl():
     const = bool(await Exact(StmtToken.CONST))
-    if dt := await ps_vtype():
+    if dt := await ps_data_type():
+        if await Exact(BracToken.LSQUARE):
+            await expect(Exact(BracToken.RSQUARE))
+            dt = ArrayType(dt, const=const)
+            const = True
         ident = await expect(ps_ident({Flavor.NONE}), expected='variable name')
-        return Variable(const, dt, ident.token.name)
+        return Variable(ident.token.name, dt, const)
     elif const:
         raise await ParserError.expected('data type after const')
 
@@ -43,19 +43,21 @@ async def ps_decl():
 async def ps_vdecl(ctx):
     start = await cursor()
     if var := await ps_decl():
-        if await Exact(StmtToken.ASSIGN):
-            return Declaration(var, await expect(ps_expr(ctx)), start)
-        elif brac := await Exact(BracToken.LSQUARE):
-            if var.const:
-                raise ParserError('VLAs should not be declared const', start)
-            elif isinstance(var.type, ArrayType):
+        if brac := await Exact(BracToken.LSQUARE):
+            if isinstance(var.type, ArrayType):
                 raise ParserError('Unexpected [', brac.span)
-            dt = ArrayType(var.type)
-            init = ArrayInitializer(dt, await expect(ps_expr(ctx)))
+            length = await expect(ps_expr(ctx))
             await expect(Exact(BracToken.RSQUARE))
-            return Declaration(Variable(False, dt, var.name), init, start)
-        else:
-            raise await ParserError.expected('= or [')
+            return Declaration(
+                Variable(var.name, ArrayType(var.type, var.const), const=True),
+                # Should produce TC error if variable is const array
+                ArrayInitializer(ArrayType(var.type, const=False), length),
+                start
+            )
+
+        await expect(Exact(StmtToken.ASSIGN), expected='= or [')
+        init = await expect(ps_expr(ctx))
+        return Declaration(var, init, start)
 
 
 # No need for this to be a Parser rule
@@ -66,6 +68,10 @@ async def comma_list(rule):
         while await Exact(SepToken.COMMA):
             result.append(await expect(rule))
     return tuple(result)
+
+
+async def if_expect(cond, rule, **kwargs):
+    return await (expect(rule, **kwargs) if cond else rule)
 
 
 # left associative binary op
@@ -108,7 +114,7 @@ async def ps_expr0(ctx):
     elif func_call := await ps_func_call(ctx):
         return func_call
     elif ident := await ps_ident({Flavor.NONE}):
-        return VariableLookup(ident.token.name, ident.span)
+        return VariableLookup(UnresolvedName(ident.token.name), ident.span)
 
 @Parser.routine('expression')
 async def ps_expr1(ctx):
@@ -248,6 +254,14 @@ async def ps_block(ctx):
     return await ps_code_block(ctx)
 
 
+@Parser.routine('parameter')
+async def ps_param():
+    start = await cursor()
+    if var := await ps_decl():
+        end = await cursor()
+        return Parameter(var, Span(start, end))
+
+
 @Parser.routine('function declaration')
 async def ps_func():
     if not (tp := await Instance(DataType)): return
@@ -262,12 +276,12 @@ async def ps_func():
     else:
         ctx = BlockContext.FUNC
 
-    params = await comma_list(ps_decl())
+    params = await comma_list(ps_param())
     end_decl = await expect(Exact(BracToken.RPAREN))
     body = await expect(ps_code_block(ctx))
     return FuncDeclaration(
-        tp.span | end_decl.span,
-        ret_type, FuncSignature(name.token, params), body
+        tp.span | end_decl.span, ret_type,
+        name.token, params, body
     )
 
 

@@ -1,5 +1,5 @@
 from . import abc
-from .expressions import BoolValue
+from .expressions import BoolValue, Expression
 from hidc.lexer import Span, Cursor
 
 import dataclasses as dc
@@ -28,7 +28,7 @@ class ControlBlock(abc.Block):
 
 @dc.dataclass(frozen=True)
 class LoopBlock(ControlBlock):
-    cond: abc.Expression
+    cond: Expression
     cont: CodeBlock
 
     @classmethod
@@ -46,7 +46,7 @@ class LoopBlock(ControlBlock):
 
 @dc.dataclass(frozen=True)
 class IfBlock(ControlBlock):
-    cond: abc.Expression
+    cond: Expression
     else_block: abc.Block
 
 

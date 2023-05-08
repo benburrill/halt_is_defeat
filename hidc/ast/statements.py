@@ -5,12 +5,13 @@ import dataclasses as dc
 
 from hidc.lexer import Span, Cursor
 from hidc.lexer.tokens import Op
+from .expressions import Expression, Assignable
 
 
 @dc.dataclass(frozen=True)
 class Declaration(abc.Statement):
     var: Variable
-    init: abc.Expression
+    init: Expression
     start: Cursor
 
     @property
@@ -20,8 +21,8 @@ class Declaration(abc.Statement):
 
 @dc.dataclass(frozen=True)
 class Assignment(abc.Statement):
-    lookup: abc.Assignable
-    expr: abc.Expression
+    lookup: Assignable
+    expr: Expression
 
     @property
     def span(self):
@@ -36,7 +37,7 @@ class IncAssignment(Assignment):
 @dc.dataclass(frozen=True)
 class ReturnStatement(abc.Statement):
     span: Span
-    value: abc.Expression = None
+    value: Expression = None
 
 
 @dc.dataclass(frozen=True)
