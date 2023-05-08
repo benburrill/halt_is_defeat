@@ -75,11 +75,11 @@ async def if_expect(cond, rule, **kwargs):
 
 
 # left associative binary op
-async def bin_op(expr_rule, ops):
+async def bin_op(expr_rule, operators):
     if not (expr := await expr_rule): return
-    while op := await OneOf(ops):
+    while op := await OneOf(operators):
         right = await expect(expr_rule)
-        expr = BinaryOp(op.token, op.span, expr, right)
+        expr = operators[op.token](op.span, expr, right)
     return expr
 
 
@@ -130,32 +130,37 @@ async def ps_expr1(ctx):
 
 @Parser.routine('expression')
 async def ps_expr2(ctx):
-    if op := await OneOf({Op.ADD, Op.SUB, Op.NOT}):
-        return UnaryOp(op.token, op.span, await expect(ps_expr2(ctx)))
+    operators = {OpToken.ADD: Pos, OpToken.SUB: Neg, OpToken.NOT: Not}
+    if op := await OneOf(operators):
+        return operators[op.token](op.span, await expect(ps_expr2(ctx)))
     return await ps_expr1(ctx)
 
 @Parser.routine('expression')
 async def ps_expr3(ctx):
-    return await bin_op(ps_expr2(ctx), {Op.MUL, Op.DIV, Op.MOD})
+    return await bin_op(ps_expr2(ctx), {
+        OpToken.MUL: Mul, OpToken.DIV: Div, OpToken.MOD: Mod
+    })
 
 @Parser.routine('expression')
 async def ps_expr4(ctx):
-    return await bin_op(ps_expr3(ctx), {Op.ADD, Op.SUB})
+    return await bin_op(ps_expr3(ctx), {
+        OpToken.ADD: Add, OpToken.SUB: Sub
+    })
 
 @Parser.routine('expression')
 async def ps_expr5(ctx):
     return await bin_op(ps_expr4(ctx), {
-        Op.LT, Op.LE, Op.GT, Op.GE,
-        Op.EQ, Op.NE
+        OpToken.LT: Lt, OpToken.LE: Le, OpToken.GT: Gt, OpToken.GE: Ge,
+        OpToken.EQ: Eq, OpToken.NE: Ne
     })
 
 @Parser.routine('expression')
 async def ps_expr6(ctx):
-    return await bin_op(ps_expr5(ctx), {Op.AND})
+    return await bin_op(ps_expr5(ctx), {OpToken.AND: And})
 
 @Parser.routine('expression')
 async def ps_expr(ctx):
-    return await bin_op(ps_expr6(ctx), {Op.OR})
+    return await bin_op(ps_expr6(ctx), {OpToken.OR: Or})
 
 
 @Parser.routine('assignment')
@@ -167,7 +172,7 @@ async def ps_assignment(ctx):
             elif lxm := await Instance(IncAssignToken):
                 return IncAssignment(
                     assignable, await expect(ps_expr(ctx)),
-                    lxm.token.operator
+                    binary_ops[lxm.token.operator]
                 )
 
 

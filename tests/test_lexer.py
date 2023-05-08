@@ -84,7 +84,7 @@ def test_lex_keyword():
     with raises(LexerError): lex_string('!for')
 
 def test_lex_symbol():
-    assert lex_string('x+1') == [Ident('x'), Op.ADD, IntToken(1)]
+    assert lex_string('x+1') == [Ident('x'), OpToken.ADD, IntToken(1)]
     assert lex_string('+=') == [IncAssignToken.IADD]
 
 def test_large():
@@ -127,12 +127,12 @@ def test_syntax():
     with raises(LexerError): lex_string('#')
 
 def test_enum_sanity():
-    assert Op.ADD != '+'
-    assert str(Op.ADD) == Op.ADD.value == '+'
-    assert Op('+') is Op.ADD
-    assert isinstance(Op.ADD, Token)
-    assert isinstance(Op.ADD.value, str)
-    assert not isinstance(Op.ADD.value, Token)
+    assert OpToken.ADD != '+'
+    assert str(OpToken.ADD) == OpToken.ADD.value == '+'
+    assert OpToken('+') is OpToken.ADD
+    assert isinstance(OpToken.ADD, Token)
+    assert isinstance(OpToken.ADD.value, str)
+    assert not isinstance(OpToken.ADD.value, Token)
 
     assert Flavor.YOU != '@'
     assert str(Flavor.YOU) == Flavor.YOU.value == '@'

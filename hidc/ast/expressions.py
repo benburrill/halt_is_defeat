@@ -4,7 +4,6 @@ from hidc.lexer import Span, Cursor
 
 import dataclasses as dc
 from collections.abc import Sequence
-from hidc.lexer.tokens import Op
 
 from hidc.utils.data_abc import Abstract
 from abc import abstractmethod
@@ -85,19 +84,15 @@ class TypeCast(Expression):
 class ByteToInt(TypeCast):
     map = (DataType.BYTE, DataType.INT)
 
-
 class IntToByte(TypeCast):
     map = (DataType.INT, DataType.BYTE)
-
 
 class IntToBool(TypeCast):
     map = (DataType.INT, DataType.BOOL)
 
-
 class BoolToByte(TypeCast):
     # in code generation this typecast does nothing
     map = (DataType.BOOL, DataType.BYTE)
-
 
 class StringToByteArray(TypeCast):
     map = (DataType.STRING, ArrayType(DataType.BYTE, const=True))
@@ -416,35 +411,3 @@ class ArrayInitializer(Expression):
         return ArrayInitializer(
             self.type, self.length.evaluate(env).coerce(DataType.INT)
         )
-
-
-
-
-
-
-
-@dc.dataclass(frozen=True)
-class BinaryOp(Expression):
-    op: Op
-    op_span: Span
-    left: Expression
-    right: Expression
-
-    @property
-    def span(self):
-        return self.left.span | self.right.span
-    def evaluate(self, env):
-        raise NotImplementedError
-
-
-@dc.dataclass(frozen=True)
-class UnaryOp(Expression):
-    op: Op
-    op_span: Span
-    expr: Expression
-
-    @property
-    def span(self):
-        return self.op_span | self.expr.span
-    def evaluate(self, env):
-        raise NotImplementedError

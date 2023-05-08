@@ -4,7 +4,7 @@ from .symbols import Variable
 import dataclasses as dc
 
 from hidc.lexer import Span, Cursor
-from hidc.lexer.tokens import Op
+from .operators import Binary
 from .expressions import Expression, Assignable
 
 
@@ -31,7 +31,7 @@ class Assignment(abc.Statement):
 
 @dc.dataclass(frozen=True)
 class IncAssignment(Assignment):
-    op: Op
+    bin_op: type[Binary]
 
 
 @dc.dataclass(frozen=True)

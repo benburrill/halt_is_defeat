@@ -82,35 +82,32 @@ def test_literal():
     with raises(ParserError): parse_string('[1 2]', ps_expr(ctx))
 
 def test_precedence():
-    assert parse_string('1 + 2 + 3', ps_expr(ctx)) == BinaryOp(
-        Op.ADD, _,
-        BinaryOp(Op.ADD, _, IntValue(1, _), IntValue(2, _)),
+    assert parse_string('1 + 2 + 3', ps_expr(ctx)) == Add(
+        _, Add(_, IntValue(1, _), IntValue(2, _)),
         IntValue(3, _)
     )
 
-    assert parse_string('1 + (2 + 3)', ps_expr(ctx)) == BinaryOp(
-        Op.ADD, _,
-        IntValue(1, _),
-        BinaryOp(Op.ADD, _, IntValue(2, _), IntValue(3, _))
+    assert parse_string('1 + (2 + 3)', ps_expr(ctx)) == Add(
+        _, IntValue(1, _),
+        Add(_, IntValue(2, _), IntValue(3, _))
     )
 
-    assert parse_string('1 + 2 * 3', ps_expr(ctx)) == BinaryOp(
-        Op.ADD, _,
-        IntValue(1, _),
-        BinaryOp(Op.MUL, _, IntValue(2, _), IntValue(3, _))
+    assert parse_string('1 + 2 * 3', ps_expr(ctx)) == Add(
+        _, IntValue(1, _),
+        Mul(_, IntValue(2, _), IntValue(3, _))
     )
 
-    assert parse_string('1 + -2', ps_expr(ctx)) == BinaryOp(
-        Op.ADD, _, IntValue(1, _),
-        UnaryOp(Op.SUB, _, IntValue(2, _))
+    assert parse_string('1 + -2', ps_expr(ctx)) == Add(
+        _, IntValue(1, _),
+        Neg(_, IntValue(2, _))
     )
 
 def test_func_flavor():
     assert (
-            parse_string('f(x)', ps_expr(ctx)) ==
-            parse_string('f(x)', ps_expr(yctx)) ==
-            parse_string('f(x)', ps_expr(dctx)) ==
-            FuncCall(Ident('f'), (VariableLookup(UnresolvedName('x'), _),), _)
+        parse_string('f(x)', ps_expr(ctx)) ==
+        parse_string('f(x)', ps_expr(yctx)) ==
+        parse_string('f(x)', ps_expr(dctx)) ==
+        FuncCall(Ident('f'), (VariableLookup(UnresolvedName('x'), _),), _)
     )
 
     assert parse_string('!f(x)', ps_expr(dctx)) == FuncCall(
@@ -198,10 +195,7 @@ def test_return():
                 Parameter(Variable('x', DataType.INT, const=False),_),
             ),
             CodeBlock((ReturnStatement(
-                _, BinaryOp(
-                    Op.ADD, _,
-                    VariableLookup(UnresolvedName('x'), _), IntValue(1, _)
-                )
+                _, Add(_, VariableLookup(UnresolvedName('x'), _), IntValue(1, _))
             ),), _)
         ),)
     )
@@ -219,9 +213,8 @@ def test_for():
         ),
         LoopBlock(
             start=_,
-            cond=BinaryOp(
-                Op.LT, _,
-                VariableLookup(UnresolvedName('i'), _),
+            cond=Lt(
+                _, VariableLookup(UnresolvedName('i'), _),
                 LengthLookup(VariableLookup(UnresolvedName('arr'), _), _)
             ),
             body=CodeBlock((
@@ -237,7 +230,7 @@ def test_for():
                 IncAssignment(
                     VariableLookup(UnresolvedName('i'), _),
                     IntValue(1, _),
-                    Op.ADD
+                    Add
                 ),
             ), _)
         )
@@ -272,12 +265,9 @@ def test_if():
         }
     """, ps_block(ctx)) == IfBlock(
         start=_,
-        cond=BinaryOp(
-            Op.OR, _,
-            BinaryOp(Op.EQ, _, VariableLookup(UnresolvedName('x'), _),
-                     IntValue(1, _)),
-            BinaryOp(Op.EQ, _, VariableLookup(UnresolvedName('y'), _),
-                     IntValue(2, _))
+        cond=Or(_,
+            Eq(_, VariableLookup(UnresolvedName('x'), _), IntValue(1, _)),
+            Eq(_, VariableLookup(UnresolvedName('y'), _), IntValue(2, _))
         ),
         body=CodeBlock((
             FuncCall(
@@ -366,7 +356,7 @@ def test_program():
     """, ps_program()) == Program(
         var_decls=(Declaration(
             Variable('x', DataType.INT, const=False),
-            UnaryOp(Op.SUB, _, IntValue(5, _)), _
+            Neg(_, IntValue(5, _)), _
         ),),
         func_decls=(FuncDeclaration(
             _, DataType.VOID, Ident.you('is_you'), (),

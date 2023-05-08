@@ -75,7 +75,7 @@ def include_enum(cls):
 
 
 @include_enum
-class Op(EnumToken):
+class OpToken(EnumToken):
     ADD = '+'
     SUB = '-'
     MUL = '*'
@@ -102,7 +102,7 @@ class IncAssignToken(EnumToken):
 
     @property
     def operator(self):
-        return Op(self.value[:-1])
+        return OpToken(self.value[:-1])
 
 
 @include_enum
@@ -166,5 +166,3 @@ class BoolToken(EnumToken):
     @property
     def data(self):
         return self != type(self).FALSE
-
-

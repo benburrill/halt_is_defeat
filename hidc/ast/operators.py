@@ -1,10 +1,12 @@
 from .symbols import DataType
+from .expressions import Expression, BoolValue, IntValue, PrimitiveValue
 from hidc.lexer import Span
+from hidc.lexer.tokens import OpToken
 from hidc.errors import TypeCheckError
 
 import dataclasses as dc
+from hidc.utils.data_abc import Abstract
 from abc import abstractmethod
-from .expressions import Expression, BoolValue, IntValue, PrimitiveValue
 import operator
 
 # kinds of operator:
@@ -27,9 +29,9 @@ import operator
 # coercible to byte, but i + 1 is not coercible to byte for integer i
 
 
-@dc.dataclass
 class Operator(Expression):
-    op_span: Span
+    op_span: Abstract[Span]
+    token: Abstract[OpToken]
 
     @abstractmethod
     def operate(self, *args):
@@ -40,9 +42,10 @@ class Operator(Expression):
     def args(self):
         pass
 
-
-@dc.dataclass
+binary_ops = {}
+@dc.dataclass(frozen=True)
 class Binary(Operator):
+    op_span: Span
     left: Expression
     right: Expression
 
@@ -50,14 +53,36 @@ class Binary(Operator):
     def args(self):
         return self.left, self.right
 
+    @property
+    def span(self):
+        return self.left.span | self.right.span
 
-@dc.dataclass
+    def __init_subclass__(cls, **kwargs):
+        if tok := cls.__dict__.get('token', None):
+            if tok in binary_ops:
+                raise TypeError('Duplicate token')
+            binary_ops[tok] = cls
+
+
+unary_ops = {}
+@dc.dataclass(frozen=True)
 class Unary(Operator):
+    op_span: Span
     arg: Expression
 
     @property
     def args(self):
         return self.arg,
+
+    @property
+    def span(self):
+        return self.op_span | self.arg.span
+
+    def __init_subclass__(cls, **kwargs):
+        if tok := cls.__dict__.get('token', None):
+            if tok in unary_ops:
+                raise TypeError('Duplicate token')
+            unary_ops[tok] = cls
 
 
 class BooleanOp(Operator):
@@ -89,18 +114,15 @@ class CompareOp(BooleanOp):
         ).simplify()
 
 
-class EqualityOp(Binary, BooleanOp):
+class EqualityOp(BooleanOp):
     def evaluate(self, env):
-        left = self.left.evaluate(env)
-        right = self.right.evaluate(env)
-
-        if left.type == right.type == DataType.BOOL:
-            return type(self)(self.op_span, left, right).simplify()
+        args = [arg.evaluate(env) for arg in self.args]
+        if all(arg.type == DataType.BOOL for arg in args):
+            return type(self)(self.op_span, *args).simplify()
 
         return type(self)(
             self.op_span,
-            left.coerce(DataType.INT),
-            right.coerce(DataType.INT)
+            *[arg.coerce(DataType.INT) for arg in args]
         ).simplify()
 
 
@@ -152,71 +174,87 @@ class UnaryArithmeticOp(Unary, ArithmeticOp):
 
 
 class Add(BinaryArithmeticOp):
+    token = OpToken.ADD
     operate = operator.add
 
 class Sub(BinaryArithmeticOp):
+    token = OpToken.SUB
     operate = operator.sub
 
 class Mul(BinaryArithmeticOp):
+    token = OpToken.MUL
     operate = operator.mul
 
 class Div(BinaryArithmeticOp):
+    token = OpToken.DIV
     def operate(self, left, right):
         try:
             return left // right
         except ZeroDivisionError:
-            raise TypeCheckError('Division by zero', self.span)
+            raise TypeCheckError('Division by zero', self.op_span)
 
 class Mod(BinaryArithmeticOp):
+    token = OpToken.MOD
     def operate(self, left, right):
         try:
             return left % right
         except ZeroDivisionError:
-            raise TypeCheckError('Modulus of zero', self.span)
+            raise TypeCheckError('Modulus of zero', self.op_span)
 
-class Plus(UnaryArithmeticOp):
+class Pos(UnaryArithmeticOp):
+    token = OpToken.ADD
     operate = operator.pos
 
-class Minus(UnaryArithmeticOp):
+class Neg(UnaryArithmeticOp):
+    token = OpToken.SUB
     operate = operator.neg
 
 class And(Binary, LogicalOp):
+    token = OpToken.AND
     @staticmethod
     def operate(left, right):
         return bool(left and right)
 
 class Or(Binary, LogicalOp):
+    token = OpToken.OR
     @staticmethod
     def operate(left, right):
         return bool(left or right)
 
 class Not(Unary, LogicalOp):
+    token = OpToken.NOT
     @staticmethod
     def operate(arg):
         return not arg
 
 class Lt(Binary, CompareOp):
+    token = OpToken.LT
     operate = operator.lt
 
 class Gt(Binary, CompareOp):
+    token = OpToken.GT
     operate = operator.gt
 
-class LtE(Binary, CompareOp):
+class Le(Binary, CompareOp):
+    token = OpToken.LE
     operate = operator.le
 
-class GtE(Binary, CompareOp):
+class Ge(Binary, CompareOp):
+    token = OpToken.GE
     operate = operator.ge
 
 class Eq(Binary, EqualityOp):
+    token = OpToken.EQ
     operate = operator.eq
 
-class Neq(Binary, EqualityOp):
+class Ne(Binary, EqualityOp):
+    token = OpToken.NE
     operate = operator.ne
 
 # Is isn't considered a true operator, it's just an expression
 @dc.dataclass(frozen=True)
 class Is(Expression):
-    op_span: Span
+    span: Span
     expr: Expression
     type: DataType
 
