@@ -90,6 +90,7 @@ class OpToken(EnumToken):
     OR = 'or'
     AND = 'and'
     NOT = 'not'
+    IS = 'is'
 
 
 @include_enum

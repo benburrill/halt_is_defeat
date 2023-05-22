@@ -1,4 +1,4 @@
-from .symbols import DataType
+from .symbols import DataType, Type
 from .expressions import Expression, BoolValue, IntValue, PrimitiveValue
 from hidc.lexer import Span
 from hidc.lexer.tokens import OpToken
@@ -256,7 +256,7 @@ class Ne(Binary, EqualityOp):
 class Is(Expression):
     span: Span
     expr: Expression
-    type: DataType
+    type: Type
 
     def evaluate(self, env):
         return self.expr.evaluate(env).cast(self.type)

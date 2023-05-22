@@ -172,3 +172,12 @@ def test_coercion():
             byte y = x * 3 + 2;
         }
     """)
+
+
+def test_cast():
+    assert_valid("""
+        void f() {
+            int x = true is int;
+            bool y = 10 is bool;
+        }
+    """)

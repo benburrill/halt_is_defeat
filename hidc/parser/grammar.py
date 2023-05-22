@@ -137,30 +137,42 @@ async def ps_expr2(ctx):
 
 @Parser.routine('expression')
 async def ps_expr3(ctx):
-    return await bin_op(ps_expr2(ctx), {
-        OpToken.MUL: Mul, OpToken.DIV: Div, OpToken.MOD: Mod
-    })
+    start = await cursor()
+    if not (expr := await ps_expr2(ctx)): return
+    if not await Exact(OpToken.IS):
+        return expr
+    tp = await expect(ps_data_type())
+    if await Exact(BracToken.LSQUARE):
+        await expect(BracToken.RSQUARE)
+        tp = ArrayType(tp, const=True)
+    return Is(Span(start, await cursor()), expr, tp)
 
 @Parser.routine('expression')
 async def ps_expr4(ctx):
     return await bin_op(ps_expr3(ctx), {
-        OpToken.ADD: Add, OpToken.SUB: Sub
+        OpToken.MUL: Mul, OpToken.DIV: Div, OpToken.MOD: Mod
     })
 
 @Parser.routine('expression')
 async def ps_expr5(ctx):
     return await bin_op(ps_expr4(ctx), {
+        OpToken.ADD: Add, OpToken.SUB: Sub
+    })
+
+@Parser.routine('expression')
+async def ps_expr6(ctx):
+    return await bin_op(ps_expr5(ctx), {
         OpToken.LT: Lt, OpToken.LE: Le, OpToken.GT: Gt, OpToken.GE: Ge,
         OpToken.EQ: Eq, OpToken.NE: Ne
     })
 
 @Parser.routine('expression')
-async def ps_expr6(ctx):
-    return await bin_op(ps_expr5(ctx), {OpToken.AND: And})
+async def ps_expr7(ctx):
+    return await bin_op(ps_expr6(ctx), {OpToken.AND: And})
 
 @Parser.routine('expression')
 async def ps_expr(ctx):
-    return await bin_op(ps_expr6(ctx), {OpToken.OR: Or})
+    return await bin_op(ps_expr7(ctx), {OpToken.OR: Or})
 
 
 @Parser.routine('assignment')
