@@ -1,6 +1,5 @@
 from . import abc
-from hidc.lexer.tokens import DataType, Ident
-from hidc.errors import TypeCheckError
+from hidc.lexer.tokens import DataType, Ident, Flavor
 
 import dataclasses as dc
 from collections import ChainMap
@@ -36,18 +35,6 @@ class UnresolvedName:
 
 
 class VarTable(ChainMap):
-    def __setitem__(self, name, declaration):
-        if prev_decl := self.get(name):
-            # Fine to shadow globals, so long as we are not in the
-            # global scope.
-            if self.is_global or prev_decl is not self.globals.get(name):
-                raise TypeCheckError(
-                    f'Redeclaration of variable {name}',
-                    declaration.span
-                )
-
-        super().__setitem__(name, declaration)
-
     @property
     def globals(self):
         return self.maps[-1]
@@ -65,13 +52,17 @@ class FuncSignature:
 
     def __str__(self):
         params = ', '.join(map(str, self.arg_types))
-        return f'{self.name}({params})'
+        return f'{self.name.name}({params})'
 
 
 @dc.dataclass(frozen=True)
 class Environment:
     vars: VarTable
     funcs: dict
+    return_type: DataType = None
 
-    def new_child(self):
-        return Environment(self.vars.new_child(), self.funcs)
+    def new_child(self, return_type=None):
+        return Environment(
+            self.vars.new_child(), self.funcs,
+            self.return_type if return_type is None else return_type
+        )

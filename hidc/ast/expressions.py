@@ -1,6 +1,7 @@
 from . import abc
 from .symbols import *
 from hidc.lexer import Span, Cursor
+from hidc.errors import TypeCheckError
 
 import dataclasses as dc
 from collections.abc import Sequence
@@ -10,11 +11,6 @@ from abc import abstractmethod
 
 
 class Expression(abc.Statement):
-    # TODO: I might make this an abstract method of statements instead.
-    @abstractmethod
-    def evaluate(self, env):
-        pass
-
     type: Abstract[Type]
 
     def cast(self, new_type):
@@ -146,7 +142,7 @@ class VariableLookup(Assignable):
         if isinstance(self.var, UnresolvedName):
             try:
                 decl = env.vars[self.var.name]
-            except IndexError:
+            except KeyError:
                 raise TypeCheckError(f'{self.var.name} is empty', self.span) from None
 
             var = decl.var
@@ -224,26 +220,30 @@ class FuncCall(Expression):
     type: Type = DataType.VOID
 
     def evaluate(self, env):
-        sig = self.signature
+        args = tuple(arg.evaluate(env) for arg in self.args)
+        arg_sig = FuncSignature(self.func, tuple(arg.type for arg in args))
+        sig = arg_sig
 
         try:
             func = env.funcs[sig]
         except KeyError:
             for sig, func in env.funcs.items():
-                if sig.name == self.func and len(sig.arg_types) == len(self.args):
-                    for arg, sig_type in zip(self.args, sig.arg_types):
-                        if arg.coercible(sig_type):
+                if sig.name == self.func and len(sig.arg_types) == len(args):
+                    for arg, sig_type in zip(args, sig.arg_types):
+                        if not arg.coercible(sig_type):
                             break
+                    else:
+                        break
             else:
                 raise TypeCheckError(
-                    f'No matching function for signature {self.signature}',
+                    f'No matching function for signature {arg_sig}',
                     self.span
                 ) from None
 
         return FuncCall(
             self.func, tuple([
                 arg.coerce(sig_type)
-                for arg, sig_type in zip(self.args, sig.arg_types)
+                for arg, sig_type in zip(args, sig.arg_types)
             ]),
             self.span, func.ret_type
         )

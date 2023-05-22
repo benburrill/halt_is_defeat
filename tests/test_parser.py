@@ -230,7 +230,7 @@ def test_for():
                 IncAssignment(
                     VariableLookup(UnresolvedName('i'), _),
                     IntValue(1, _),
-                    Add
+                    Add, _
                 ),
             ), _)
         )

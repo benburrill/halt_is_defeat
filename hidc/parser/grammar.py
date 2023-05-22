@@ -172,7 +172,8 @@ async def ps_assignment(ctx):
             elif lxm := await Instance(IncAssignToken):
                 return IncAssignment(
                     assignable, await expect(ps_expr(ctx)),
-                    binary_ops[lxm.token.operator]
+                    binary_ops[lxm.token.operator],
+                    lxm.span
                 )
 
 
