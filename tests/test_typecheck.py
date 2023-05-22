@@ -80,3 +80,39 @@ def test_exit():
             }
         }
     """)
+
+def test_const_arrays():
+    assert_valid("""
+        void f(const int[] x) {}
+        void g(int[] x) {
+            f(x);
+        }
+    """)
+
+    assert_invalid("""
+        void f(int[] x) {}
+        void g(const int[] x) {
+            f(x);
+        }
+    """)
+
+    assert_valid("""
+        void f() {
+            const int[] x = [1, 2, 3];
+            const int[] y = x;
+        }
+    """)
+
+    assert_invalid("""
+        void f() {
+            const int[] x = [1, 2, 3];
+            int[] y = x;
+        }
+    """)
+
+    assert_invalid("""
+        void f() {
+            int[] x = [1, 2, 3];
+            const int[] y = x;
+        }
+    """)

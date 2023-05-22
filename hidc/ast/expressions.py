@@ -120,6 +120,10 @@ class Volatile(Expression):
     def cast(self, new_type):
         return self.expr.cast(new_type)
 
+    @property
+    def span(self):
+        return self.expr.span
+
 
 class Assignable(Expression):
     const: Abstract[bool]
