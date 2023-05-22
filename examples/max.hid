@@ -15,9 +15,8 @@ int @max(const int[] arr) {
         !is_defeat();
     } undo {
         // First item was the max, return it
-        // Probably we'd actually need to put this outside the undo,
-        // since otherwise it would be hard for the compiler to tell if
-        // we could get to the end of the function without returning.
+        // The typechecker knows !is_defeat() is guaranteed defeat, so
+        // we can put the return here without it complaining.
         return arr[0];
     }
 }
