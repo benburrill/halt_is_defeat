@@ -77,7 +77,7 @@ class IncAssignment(Assignment):
         ).evaluate(env)
 
         return IncAssignment(
-            equiv_assign.lookup, equiv_assign.expr.right,
+            equiv_assign.lookup, self.expr.evaluate(env),
             self.bin_op, self.op_span
         )
 

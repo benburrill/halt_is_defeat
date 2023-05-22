@@ -392,7 +392,7 @@ class ArrayLiteral(Expression):
             # that type here, that should be done when used.  The reason
             # is that [1, b] is preferentially int[] but is coercible to
             # byte[].  But if we coerce b to int, we can't go back.
-            if all(v.coercible(value.type) for v in self.values):
+            if all(v.coercible(value.type) for v in values):
                 return ArrayLiteral(values, self.span, ArrayType(value.type, const=True))
         raise TypeCheckError('Array type is unresolvable', self.span)
 

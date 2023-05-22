@@ -1,9 +1,7 @@
-from hidc.parser.rules import expect
 from hidc.parser import parse
 from hidc.errors import TypeCheckError
-from hidc.lexer import SourceCode, Span, Cursor
+from hidc.lexer import SourceCode
 
-import typing as ty
 from pytest import raises
 
 
@@ -81,6 +79,7 @@ def test_exit():
         }
     """)
 
+
 def test_const_arrays():
     assert_valid("""
         void f(const int[] x) {}
@@ -114,5 +113,62 @@ def test_const_arrays():
         void f() {
             int[] x = [1, 2, 3];
             const int[] y = x;
+        }
+    """)
+
+def test_coercion():
+    assert_valid("""
+        void f() {
+            int x = 'a';
+            byte y = 10;
+        }
+    """)
+
+    assert_invalid("""
+        void f() {
+            int x = true;
+            bool y = 10;
+        }
+    """)
+
+    assert_invalid("""
+        void f() {
+            int x = 10;
+            byte y = x;
+        }
+    """)
+
+    assert_valid("""
+        void f() {
+            int[] x = [1, 'a'];
+            byte[] x = [1, 'a'];
+        }
+    """)
+
+    assert_valid("""
+        void f() {
+            byte x = 1;
+            int[] x = [x, 1];
+        }
+    """)
+
+    assert_invalid("""
+        void f() {
+            int x = 1;
+            byte[] x = [x, 'a'];
+        }
+    """)
+
+    assert_valid("""
+        void f() {
+            byte x = 0;
+            x += 1;
+        }
+    """)
+
+    assert_valid("""
+        void f() {
+            byte x = 0;
+            byte y = x * 3 + 2;
         }
     """)
