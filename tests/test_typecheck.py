@@ -153,21 +153,21 @@ def test_coercion():
     assert_valid("""
         void f() {
             int[] x = [1, 'a'];
-            byte[] x = [1, 'a'];
+            byte[] y = [1, 'a'];
         }
     """)
 
     assert_valid("""
         void f() {
             byte x = 1;
-            int[] x = [x, 1];
+            int[] y = [x, 1];
         }
     """)
 
     assert_invalid("""
         void f() {
             int x = 1;
-            byte[] x = [x, 'a'];
+            byte[] y = [x, 'a'];
         }
     """)
 
@@ -221,5 +221,56 @@ def test_unreachable():
         void f() {
             return;
             print("hi");
+        }
+    """)
+
+def test_operators():
+    assert_valid("""
+        void f(int x, byte y) {
+            int a = 2 + 3;
+            int b = 2 + y;
+            int c = x + y;
+            bool d = 1 < 2;
+            bool e = x < y;
+            bool f = d and e;
+            bool g = not f;
+            bool h = x == y;
+        }
+    """)
+
+def test_shadowing():
+    assert_valid("""
+        int x = 3;
+        int y = 10;
+        void f(int x) {
+            int y = 8;
+        }
+    """)
+
+    assert_invalid("""
+        void f() {
+            int x = 3;
+            int x = 8;
+        }
+    """)
+
+    assert_invalid("""
+        void f() {
+            int x = 3;
+            if (true) {
+                int x = 8;
+            }
+        }
+    """)
+
+    assert_invalid("""
+        void f(int x) {
+            int x = 3;
+        }
+    """)
+
+    assert_invalid("""
+        void f(int x, int x) {
+        
         }
     """)

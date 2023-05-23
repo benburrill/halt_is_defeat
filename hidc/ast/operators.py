@@ -91,7 +91,7 @@ class BooleanOp(Operator):
     def simplify(self):
         if all(isinstance(arg, PrimitiveValue) for arg in self.args):
             return BoolValue(
-                bool(self.operate(*self.args)),
+                bool(self.operate(*[arg.data for arg in self.args])),
                 self.span
             )
 
@@ -132,7 +132,7 @@ class ArithmeticOp(Operator):
     def simplify(self):
         if all(isinstance(arg, IntValue) for arg in self.args):
             return IntValue(
-                int(self.operate(*self.args)),
+                int(self.operate(*[arg.data for arg in self.args])),
                 self.span, all(arg.literal for arg in self.args)
             )
 

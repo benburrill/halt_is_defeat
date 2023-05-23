@@ -27,7 +27,7 @@ class Declaration(abc.Statement):
 
             # Fine to shadow globals, so long as we are not in the
             # global scope.
-            if env.vars.is_global or prev_decl is not env.vars.get(self.var.name):
+            if env.vars.is_global or prev_decl is not env.vars.globals.get(self.var.name):
                 raise TypeCheckError(
                     f'Redeclaration of variable {self.var.name}',
                     self.span
