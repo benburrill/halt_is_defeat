@@ -235,6 +235,10 @@ def test_operators():
             bool f = d and e;
             bool g = not f;
             bool h = x == y;
+            bool i = g == h;
+            int j = -x;
+            int k = -y;
+            byte l = -y;
         }
     """)
 
@@ -270,7 +274,127 @@ def test_shadowing():
     """)
 
     assert_invalid("""
-        void f(int x, int x) {
+        void f(int x, int x) {}
+    """)
+
+def test_loop():
+    assert_valid("""
+        void f() {
+            for (int i = 0; i < 10; i += 1) {
+                print(i);
+            }
+            
+            int i = 42; // Different scope
+        }
+    """)
+
+    assert_valid("""
+        int f(int x) {
+            if (x < 10) {
+                while (true) {}
+            } else {
+                return 5;
+            }
+        }
         
+        int g() {
+            for (;;) {}
+        }
+    """)
+
+    assert_invalid("""
+        int g() {
+            for (;;) {
+                break;
+            }
+        }
+    """)
+
+def test_try():
+    assert_valid("""
+        int @f() {
+            try {
+                !is_defeat();
+            } undo {
+                return 5;
+            }
+        }
+    """)
+
+    assert_valid("""
+        int @f() {
+            try {
+                preempt {
+                    !is_defeat();
+                }
+                !is_defeat();
+            } undo {
+                return 5;
+            }
+        }
+    """)
+
+    assert_invalid("""
+        int @f() {
+            try {
+                preempt {
+                    !is_defeat();
+                }
+            } undo {
+                return 5;
+            }
+        }
+    """)
+
+def test_lookups():
+    assert_valid("""
+        void f() {
+            int x[10];
+            print(x.length);
+            print(x[0]);
+        }
+    """)
+
+    assert_invalid("""
+        void f() {
+            int x = 0;
+            print(x.length);
+        }
+    """)
+
+    assert_invalid("""
+        void f() {
+            int x = 0;
+            print(x[0]);
+        }
+    """)
+
+    assert_invalid("""
+        void f() {
+            int x[10];
+            print(x["hi"]);
+        }
+    """)
+
+
+def test_func_calls():
+    assert_valid("""
+        void f(int[] x) {}
+        void g() {
+            f([]);
+        }
+    """)
+
+
+def test_undeclared():
+    assert_invalid("""
+        void f() {
+            print(x);
+        }
+    """)
+
+    assert_invalid("""
+        void f() {
+            g();
         }
     """)

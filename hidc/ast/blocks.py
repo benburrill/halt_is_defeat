@@ -102,7 +102,8 @@ class LoopBlock(ControlBlock):
         return CodeBlock((
             init or CodeBlock.empty(start),
             cls(start, body, cond or BoolValue(True, start),
-                cont and CodeBlock((cont,), cont.span))
+                CodeBlock((cont,), cont.span) if cont
+                else CodeBlock.empty(start))
         ), Span(start, body.span.end))
 
     def evaluate(self, env):
