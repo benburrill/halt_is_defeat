@@ -1,0 +1,54 @@
+// Shor's algorithm?  More like snore's algorithm!
+
+// Note: not totally sure if this will work as I expect as I haven't
+// tried actually implementing it in Sphinx, but it's pretty similar to
+// the SAT one.
+
+
+// Return a number that divides n
+// Returns |n| if n is prime (or if |n| < 2)
+int @divide(int n) {
+    if (n == 0) {
+        return 0;
+    }
+
+    if (n < 0) {
+        n = -n;
+    }
+
+
+    try {
+        int result = 0;
+        for (int b = 1; b < n; b *= 2) {
+            preempt {
+                result += b;
+            }
+
+            preempt {
+                continue;
+            }
+
+            break;
+        }
+
+        !truth_is_defeat(n % result != 0);
+        !truth_is_defeat(result == 1);
+        return result;
+    } undo {
+        return n;
+    }
+}
+
+bool @printFactors(int n) {
+    bool isPrime = true;
+    while (n > 1) {
+        int d = @divide(n);
+        if (d != n) {
+            isPrime = false;
+        }
+        println(d);
+        n /= d;
+    }
+
+    return isPrime;
+}
