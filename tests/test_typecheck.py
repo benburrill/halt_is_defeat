@@ -116,6 +116,18 @@ def test_const_arrays():
         }
     """)
 
+    assert_valid("""
+        void f() {
+            int x[10];
+        }
+    """)
+
+    assert_invalid("""
+        void f() {
+            const int x[10];
+        }
+    """)
+
 def test_coercion():
     assert_valid("""
         void f() {
@@ -179,5 +191,35 @@ def test_cast():
         void f() {
             int x = true is int;
             bool y = 10 is bool;
+        }
+    """)
+
+
+def test_bad_array():
+    assert_valid("""
+        void f() {
+            [1, 2];
+        }
+    """)
+
+    assert_invalid("""
+        void f() {
+            [[1], [2]];
+        }
+    """)
+
+
+def test_unreachable():
+    assert_valid("""
+        void f() {
+            print("hi");
+            return;
+        }
+    """)
+
+    assert_invalid("""
+        void f() {
+            return;
+            print("hi");
         }
     """)
