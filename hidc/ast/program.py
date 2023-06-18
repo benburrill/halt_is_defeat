@@ -1,5 +1,5 @@
 from .blocks import CodeBlock, ExitMode
-from .statements import Declaration
+from .statements import Declaration, ReturnStatement
 from .symbols import Type, DataType, FuncSignature, Ident, Flavor, Environment, VarTable
 from .expressions import Parameter
 from hidc.lexer import Span
@@ -43,8 +43,6 @@ class FuncDeclaration(FuncDefinition):
         )
 
     def evaluate(self, env):
-
-
         new_env = env.new_child(self.ret_type)
         for param in self.params:
             Declaration(param.var, param, param.span.start).evaluate(new_env)
@@ -54,8 +52,10 @@ class FuncDeclaration(FuncDefinition):
         # Should have been handled elsewhere, but assert just in case
         assert ExitMode.BREAK not in exit_modes
         assert ExitMode.DEFEAT not in exit_modes or self.name.flavor == Flavor.DEFEAT
-        if self.ret_type != DataType.VOID and ExitMode.NONE in exit_modes:
-            raise TypeCheckError('Missing return statement', self.body.span)
+        if ExitMode.NONE in exit_modes:
+            if self.ret_type != DataType.VOID:
+                raise TypeCheckError('Missing return statement', self.body.span)
+            body = CodeBlock(body.stmts + (ReturnStatement(body.span.end),), body.span)
         return FuncDeclaration(self.span, self.ret_type, self.name, self.params, body)
 
 
