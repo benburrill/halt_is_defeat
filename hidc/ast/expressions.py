@@ -183,6 +183,15 @@ class ArrayLookup(Assignable):
         if not isinstance(source.type, ArrayType) and source.type != DataType.STRING:
             raise TypeCheckError('Must be array or string', self.source.span)
 
+        if isinstance(source, ArrayLiteral):
+            # TODO: maybe make this a method of ArrayLiteral, but I'm
+            #  pretty sure this is the only place where this is needed.
+            if source.type.el_type == DataType.VOID:
+                raise TypeCheckError('Array type is ambiguous', source.span)
+            source = source.coerce(source.type)  # coerce elements
+        elif isinstance(source.type, ArrayType):
+            assert source.type.el_type != DataType.VOID
+
         return ArrayLookup(
             source, self.index.evaluate(env).coerce(DataType.INT),
             self.end

@@ -30,7 +30,7 @@ class Declaration(abc.Statement):
             if env.vars.is_global or prev_decl is not env.vars.globals.get(self.var.name):
                 raise TypeCheckError(
                     f'Redeclaration of variable {self.var.name}',
-                    self.span
+                    (prev_decl.span, self.span)
                 )
 
         init = self.init.evaluate(env).coerce(self.var.type)

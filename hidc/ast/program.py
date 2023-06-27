@@ -1,6 +1,6 @@
 from .blocks import CodeBlock, ExitMode
 from .statements import Declaration, ReturnStatement
-from .symbols import Type, DataType, FuncSignature, Ident, Flavor, Environment, VarTable
+from .symbols import Type, DataType, ArrayType, FuncSignature, Ident, Flavor, Environment, VarTable
 from .expressions import Parameter
 from hidc.lexer import Span
 from hidc.utils.data_abc import Abstract, DataABC
@@ -65,10 +65,12 @@ builtin_funcs = {
         BuiltinStub(DataType.VOID, Ident.defeat('is_defeat'), ()),
         BuiltinStub(DataType.VOID, Ident.defeat('truth_is_defeat'), (DataType.BOOL,)),
         BuiltinStub(DataType.VOID, Ident('print'), (DataType.STRING,)),
+        BuiltinStub(DataType.VOID, Ident('print'), (ArrayType(DataType.BYTE, const=True),)),
         BuiltinStub(DataType.VOID, Ident('print'), (DataType.INT,)),
         BuiltinStub(DataType.VOID, Ident('print'), (DataType.BYTE,)),
         BuiltinStub(DataType.VOID, Ident('print'), (DataType.BOOL,)),
         BuiltinStub(DataType.VOID, Ident('println'), (DataType.STRING,)),
+        BuiltinStub(DataType.VOID, Ident('println'), (ArrayType(DataType.BYTE, const=True),)),
         BuiltinStub(DataType.VOID, Ident('println'), (DataType.INT,)),
         BuiltinStub(DataType.VOID, Ident('println'), (DataType.BYTE,)),
         BuiltinStub(DataType.VOID, Ident('println'), (DataType.BOOL,)),
@@ -97,7 +99,10 @@ class Program:
         for func in self.func_decls:
             sig = func.signature
             if prev_decl := unevaluated_funcs.get(sig):
-                raise TypeCheckError(f'Redefinition of function {sig}', func.span)
+                raise TypeCheckError(
+                    f'Redefinition of function {sig}',
+                    (prev_decl.span, func.span)
+                )
             unevaluated_funcs[sig] = func
 
         env = Environment(VarTable(), unevaluated_funcs)
