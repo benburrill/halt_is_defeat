@@ -55,6 +55,9 @@ class FuncDeclaration(FuncDefinition):
         if ExitMode.NONE in exit_modes:
             if self.ret_type != DataType.VOID:
                 raise TypeCheckError('Missing return statement', self.body.span)
+            # TODO: pretty sure this shouldn't interfere with dead code
+            #  detection in any way even if you re-ran TC, but I don't
+            #  want to think about it right now, would be good to check.
             body = CodeBlock(body.stmts + (ReturnStatement(body.span.end),), body.span)
         return FuncDeclaration(self.span, self.ret_type, self.name, self.params, body)
 

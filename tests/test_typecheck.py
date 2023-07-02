@@ -350,38 +350,109 @@ def test_lookups():
     assert_valid("""
         void f() {
             int x[10];
-            print(x.length);
-            print(x[0]);
+            x.length;
+            int l = x.length;
+            x[0];
+            int x0 = x[0];
         }
     """)
 
     assert_invalid("""
         void f() {
             int x = 0;
-            print(x.length);
+            x.length;
         }
     """)
 
     assert_invalid("""
         void f() {
             int x = 0;
-            print(x[0]);
+            x[0];
         }
     """)
 
     assert_invalid("""
         void f() {
             int x[10];
-            print(x["hi"]);
+            x["hi"];
+        }
+    """)
+
+    assert_valid("""
+        void f() {
+            string x = "hello";
+            int l = x.length;
+            byte x0 = x[0];
         }
     """)
 
 
 def test_func_calls():
     assert_valid("""
-        void f(int[] x) {}
+        void f(const int[] x) {}
         void g() {
             f([]);
+        }
+    """)
+
+    # Ambiguous call uses first matching signature
+    assert_valid("""
+        int f(const int[] x) {return 0;}
+        string f(const string[] x) {return "";}
+        void g() {
+            int x = f([]);
+        }
+    """)
+
+    assert_invalid("""
+        string f(const string[] x) {return "";}
+        int f(const int[] x) {return 0;}
+        void g() {
+            int x = f([]);
+        }
+    """)
+
+    # If there's an exact match, it is selected
+    assert_valid("""
+        int f(const int[] x) {return 0;}
+        byte f(const byte[] x) {return 0;}
+        void g() {
+            byte x = f(['a']);
+        }
+    """)
+
+    # However, ArrayLiterals are preferentially const, so there is no
+    # exact match, and it instead coerces to f(int[])
+    #
+    # This is a quirk that I'm not sure is desired behavior.
+    # constness is an important part of signature, and you normally
+    # cannot coerce const arrays to non-const, nor can byte[] even be
+    # coerced to int[].  ArrayLiterals are special in that they allow
+    # both coercions, but ideally would "prefer" const coercions over
+    # coercion of preferred ArrayLiteral element type when matching
+    # signatures.
+    assert_invalid("""
+        int f(int[] x) {return 0;}
+        byte f(byte[] x) {return 0;}
+        void g() {
+            byte x = f(['a']);
+        }
+    """)
+
+    assert_valid("""
+        int f(int[] x) {return 0;}
+        byte f(byte[] x) {return 0;}
+        void g() {
+            int x = f(['a']);
+        }
+    """)
+
+    # However, this ambiguity can be resolved with an explicit type cast
+    assert_valid("""
+        int f(int[] x) {return 0;}
+        byte f(byte[] x) {return 0;}
+        void g() {
+            byte x = f(['a'] is byte[]);
         }
     """)
 

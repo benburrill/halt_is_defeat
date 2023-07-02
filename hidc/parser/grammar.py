@@ -143,7 +143,7 @@ async def ps_expr3(ctx):
         return expr
     tp = await expect(ps_data_type())
     if await Exact(BracToken.LSQUARE):
-        await expect(BracToken.RSQUARE)
+        await expect(Exact(BracToken.RSQUARE))
         tp = ArrayType(tp, const=True)
     return Is(Span(start, await cursor()), expr, tp)
 

@@ -171,14 +171,19 @@ class ArrayLookup(Assignable):
 
     @property
     def type(self):
+        if self.source.type == DataType.STRING:
+            return DataType.BYTE
         return self.source.type.el_type
 
     @property
     def const(self):
+        if self.source.type == DataType.STRING:
+            return False
         return self.source.type.const
 
     def evaluate(self, env):
         # TODO: get primitive value if possible
+        #  must be careful though, see LengthLookup
         source = self.source.evaluate(env)
         if not isinstance(source.type, ArrayType) and source.type != DataType.STRING:
             raise TypeCheckError('Must be array or string', self.source.span)
@@ -219,6 +224,9 @@ class LengthLookup(Expression):
         #  value in cast as that's what Expression.cast expects.
         #  -- but that's a bit of a pain because variables :(
         #  -- may need to redesign
+        #  ----- expressions in array literals do need to be evaluated
+        #  though, so it's only really valid to get the length if it's
+        #  an array literal assigned to a variable.
         source = self.source.evaluate(env)
         if not isinstance(source.type, ArrayType) and source.type != DataType.STRING:
             raise TypeCheckError('Must be array or string', self.source.span)
@@ -366,18 +374,26 @@ class ArrayLiteral(Expression):
     values: Sequence[Expression]
     span: Span
     type: Type = ArrayType(DataType.VOID, const=True)
+    type_locked: bool = False
 
     def coercible(self, new_type):
         if isinstance(new_type, ArrayType):
+            # type_locked disables type coercion between element types,
+            # but still allows coercion of constness.
+            if self.type_locked:
+                return self.type.el_type == new_type.el_type
             return all(v.coercible(new_type.el_type) for v in self.values)
         return False
 
     def cast(self, new_type):
         if isinstance(new_type, ArrayType):
+            # After a cast is performed, type coercion of array literals
+            # to other types is disabled, even if the elements are still
+            # coercible.
             return ArrayLiteral(tuple([
                 v.cast(new_type.el_type) for v in self.values
-            ]), self.span, new_type)
-        super().cast(new_type)
+            ]), self.span, new_type, type_locked=True)
+        return super().cast(new_type)
 
     def evaluate(self, env):
         if not self.values:
