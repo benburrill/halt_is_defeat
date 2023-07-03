@@ -55,3 +55,7 @@ class TypeCheckError(CompilerError):
 
 class CodeGenError(CompilerError):
     pass
+
+# TODO: when or if should this replace assertions?
+class InternalCompilerError(Exception):
+    pass

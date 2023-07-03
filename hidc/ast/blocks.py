@@ -3,7 +3,7 @@ from .expressions import BoolValue, Expression, FuncCall
 from .statements import ReturnStatement, BreakStatement, ContinueStatement
 from .symbols import DataType, Ident, Flavor
 from hidc.lexer import Span, Cursor
-from hidc.errors import TypeCheckError
+from hidc.errors import TypeCheckError, InternalCompilerError
 
 import dataclasses as dc
 from collections.abc import Sequence
@@ -32,6 +32,7 @@ class Block(Statement):
 class CodeBlock(Block):
     stmts: Sequence[Statement]
     span: Span
+    _exit_mode: ExitMode = dc.field(default=None, compare=False)
 
     @classmethod
     def empty(cls, cursor):
@@ -39,29 +40,18 @@ class CodeBlock(Block):
 
     def evaluate(self, env):
         new_env = env.new_child()
-        return CodeBlock(tuple([
-            stmt.evaluate(new_env)
-            for stmt in self.stmts
-        ]), self.span)
+        new_stmts = []
 
-    def exit_modes(self):
         mode = ExitMode.NONE
         found_continue = False
         for stmt in self.stmts:
             if ExitMode.NONE not in mode or found_continue:
-                # TODO: Previously I produced an error for dead code,
-                #  but now I'm ignoring it.
-                #  Reason being is I think the error might confuse
-                #  people when playing around with try/undo.
-                #  I think the ideal thing to do would be to strip out
-                #  dead code, but unfortunately due to how I've written
-                #  things, that's quite awkward.  :(
-                #  Possibly move this stuff to evaluate() and update an
-                #  exit_modes attribute (initially NONE I guess) on the
-                #  Block.
-                #  Another alternative would be to produce a warning.
-                # raise TypeCheckError('Unreachable statement', stmt.span)
+                if env.options.get('unreachable_error', False):
+                    raise TypeCheckError('Unreachable statement', stmt.span)
                 break
+
+            stmt = stmt.evaluate(new_env)
+            new_stmts.append(stmt)
 
             match stmt:
                 case Block():
@@ -84,7 +74,12 @@ class CodeBlock(Block):
                 case ContinueStatement():
                     found_continue = True
 
-        return mode
+        return CodeBlock(tuple(new_stmts), self.span, mode)
+
+    def exit_modes(self):
+        if self._exit_mode is None:
+            raise InternalCompilerError('Unevaluated block')
+        return self._exit_mode
 
 
 @dc.dataclass(frozen=True)

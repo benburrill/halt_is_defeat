@@ -94,7 +94,10 @@ class Program:
     var_decls: Sequence[Declaration]
     func_decls: Sequence[FuncDeclaration]
 
-    def checked(self):
+    def checked(self, options=None):
+        if options is None:
+            options = {}
+
         unevaluated_funcs = dict(builtin_funcs)
         for func in self.func_decls:
             sig = func.signature
@@ -105,7 +108,7 @@ class Program:
                 )
             unevaluated_funcs[sig] = func
 
-        env = Environment(VarTable(), unevaluated_funcs)
+        env = Environment(VarTable(), unevaluated_funcs, options)
         new_decls = [decl.evaluate(env) for decl in self.var_decls]
         new_funcs = [func.evaluate(env) for func in self.func_decls]
         return Program(new_decls, new_funcs)

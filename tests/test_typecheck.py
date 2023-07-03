@@ -5,19 +5,19 @@ from hidc.lexer import SourceCode
 from pytest import raises
 
 
-def assert_valid(string):
+def assert_valid(string, **options):
     unchecked = parse(SourceCode.from_string(string))
-    checked = unchecked.checked()
+    checked = unchecked.checked(options)
     # These are dummy assertions which are kinda pointless to check
     # Ideally I'd like to walk through the tree and make sure all types
     # match up, as they should after successful typechecking
     assert len(unchecked.var_decls) == len(checked.var_decls)
     assert len(unchecked.func_decls) == len(checked.func_decls)
 
-def assert_invalid(string):
+def assert_invalid(string, **options):
     unchecked = parse(SourceCode.from_string(string))
     with raises(TypeCheckError):
-        unchecked.checked()
+        unchecked.checked(options)
 
 
 def test_return_type():
@@ -210,14 +210,26 @@ def test_bad_array():
 
 
 def test_unreachable():
-    # I have disabled errors for dead code for now, so this code is now
-    # valid.
     assert_valid("""
         void f() {
             return;
             print("hi");
         }
     """)
+
+    assert_invalid("""
+        void f() {
+            return;
+            print("hi");
+        }
+    """, unreachable_error=True)
+
+    assert_valid("""
+        void f() {
+            print("hi");
+            return;
+        }
+    """, unreachable_error=True)
 
 def test_operators():
     assert_valid("""

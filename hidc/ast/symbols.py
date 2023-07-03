@@ -59,10 +59,11 @@ class FuncSignature:
 class Environment:
     vars: VarTable
     funcs: dict
+    options: dict = dc.field(default_factory=dict)
     return_type: DataType = None
 
     def new_child(self, return_type=None):
         return Environment(
-            self.vars.new_child(), self.funcs,
-            self.return_type if return_type is None else return_type
+            self.vars.new_child(), self.funcs, self.options,
+            self.return_type if return_type is None else return_type,
         )
