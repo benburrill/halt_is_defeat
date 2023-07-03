@@ -210,14 +210,9 @@ def test_bad_array():
 
 
 def test_unreachable():
+    # I have disabled errors for dead code for now, so this code is now
+    # valid.
     assert_valid("""
-        void f() {
-            print("hi");
-            return;
-        }
-    """)
-
-    assert_invalid("""
         void f() {
             return;
             print("hi");

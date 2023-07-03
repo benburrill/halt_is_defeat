@@ -49,7 +49,19 @@ class CodeBlock(Block):
         found_continue = False
         for stmt in self.stmts:
             if ExitMode.NONE not in mode or found_continue:
-                raise TypeCheckError('Unreachable statement', stmt.span)
+                # TODO: Previously I produced an error for dead code,
+                #  but now I'm ignoring it.
+                #  Reason being is I think the error might confuse
+                #  people when playing around with try/undo.
+                #  I think the ideal thing to do would be to strip out
+                #  dead code, but unfortunately due to how I've written
+                #  things, that's quite awkward.  :(
+                #  Possibly move this stuff to evaluate() and update an
+                #  exit_modes attribute (initially NONE I guess) on the
+                #  Block.
+                #  Another alternative would be to produce a warning.
+                # raise TypeCheckError('Unreachable statement', stmt.span)
+                break
 
             match stmt:
                 case Block():
