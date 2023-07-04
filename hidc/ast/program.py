@@ -55,7 +55,10 @@ class FuncDeclaration(FuncDefinition):
         if ExitMode.NONE in exit_modes:
             if self.ret_type != DataType.VOID:
                 raise TypeCheckError('Missing return statement', self.body.span)
-            body = CodeBlock(body.stmts + (ReturnStatement(body.span.end),), body.span)
+            body = CodeBlock(
+                body.stmts + (ReturnStatement(body.span.end),),
+                body.span, exit_modes.replace(ExitMode.NONE, ExitMode.RETURN)
+            )
         return FuncDeclaration(self.span, self.ret_type, self.name, self.params, body)
 
 

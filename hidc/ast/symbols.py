@@ -65,5 +65,5 @@ class Environment:
     def new_child(self, return_type=None):
         return Environment(
             self.vars.new_child(), self.funcs, self.options,
-            self.return_type if return_type is None else return_type,
+            self.return_type if return_type is None else return_type
         )
