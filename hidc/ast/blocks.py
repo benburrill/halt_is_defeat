@@ -107,7 +107,7 @@ class LoopBlock(ControlBlock):
     @classmethod
     def for_loop(cls, start, body, init, cond, cont):
         return CodeBlock((
-            init or CodeBlock.empty(start),
+            *((init,) if init else ()),
             cls(start, body, cond or BoolValue(True, start),
                 CodeBlock((cont,), cont.span) if cont
                 else CodeBlock.empty(start))
@@ -116,7 +116,7 @@ class LoopBlock(ControlBlock):
     def evaluate(self, env):
         return LoopBlock(
             self.start, self.body.evaluate(env),
-            self.cond.evaluate(env).coerce(DataType.BOOL),
+            self.cond.evaluate(env).cast(DataType.BOOL),
             self.cont.evaluate(env)
         )
 
@@ -141,7 +141,7 @@ class IfBlock(ControlBlock):
     def evaluate(self, env):
         return IfBlock(
             self.start, self.body.evaluate(env),
-            self.cond.evaluate(env).coerce(DataType.BOOL),
+            self.cond.evaluate(env).cast(DataType.BOOL),
             self.else_block.evaluate(env)
         )
 

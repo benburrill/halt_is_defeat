@@ -71,14 +71,21 @@ class IncAssignment(Assignment):
     op_span: Span
 
     def evaluate(self, env):
-        equiv_assign = Assignment(
-            self.lookup,
-            self.bin_op(self.op_span, self.lookup, self.expr)
-        ).evaluate(env)
+        equiv_assign = self.type_equiv_assignment().evaluate(env)
 
         return IncAssignment(
             equiv_assign.lookup, self.expr.evaluate(env),
             self.bin_op, self.op_span
+        )
+
+    def type_equiv_assignment(self):
+        # Gives an assignment which is "equivalent" to the incremental
+        # assignment for typechecking purposes, ie x += 1 --> x = x + 1
+        # It is also truly equivalent in the case of variable lookup
+        # assignments, but NOT in the case of array lookups.
+        return Assignment(
+            self.lookup,
+            self.bin_op(self.op_span, self.lookup, self.expr)
         )
 
 

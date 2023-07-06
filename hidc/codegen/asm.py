@@ -399,25 +399,25 @@ class AsciiDirective(Directive):
 
 @dc.dataclass
 class WordDirective(Directive):
-    words: tuple[Immediate, ...] = dc.field(init=False)
+    items: tuple[Immediate, ...] = dc.field(init=False)
 
-    def __init__(self, *words: Immediate):
-        self.words = words
+    def __init__(self, *items: Immediate):
+        self.items = items
 
     def lines(self):
-        if len(self.words) >= 1:
-            yield b'.word ' + b', '.join(bytes(word) for word in self.words)
+        if len(self.items) >= 1:
+            yield b'.word ' + b', '.join(bytes(word) for word in self.items)
 
 @dc.dataclass
 class ByteDirective(Directive):
-    bytes: tuple[Immediate, ...] = dc.field(init=False)
+    items: tuple[Immediate, ...] = dc.field(init=False)
 
-    def __init__(self, *bytes: Immediate):
-        self.bytes = bytes
+    def __init__(self, *items: Immediate):
+        self.items = items
 
     def lines(self):
-        if len(self.bytes) >= 1:
-            yield b'.byte ' + b', '.join(bytes(byte) for byte in self.bytes)
+        if len(self.items) >= 1:
+            yield b'.byte ' + b', '.join(bytes(byte) for byte in self.items)
 
 @dc.dataclass
 class ZeroDirective(Directive):

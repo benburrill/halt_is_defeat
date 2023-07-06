@@ -1,12 +1,13 @@
 from . import asm
 from . import stdlib
 from hidc import ast
-from hidc.ast import DataType, ArrayType
+from hidc.ast import DataType, ArrayType, ExitMode
 from .symbols import ConcreteType, ConcreteArrayType, ConcreteSignature, AccessMode
 from hidc.errors import CodeGenError, InternalCompilerError
 
-from collections import deque
+from collections import deque, ChainMap
 import dataclasses as dc
+import contextlib
 import typing as ty
 
 
@@ -77,6 +78,10 @@ class Bubble:
         return array_allocations
 
     @property
+    def has_array(self):
+        return self.array_allocations > 0 or self.static_array_size > 0
+
+    @property
     def vacuous(self):
         return self.prev == self.cur
 
@@ -100,6 +105,12 @@ class ValueBubble(Bubble):
         if self.fast_value is not None:
             return self.fast_value
         return (yield from self.value.get(r_out))
+
+@dc.dataclass
+class LoopInfo:
+    restore_point: StackPoint
+    continue_label: asm.LabelRef
+    break_label: asm.LabelRef
 
 
 arith_map = {
@@ -127,13 +138,21 @@ class CodeGen:
     word_size: int = 2
     stack_size: int = 50 # in words
 
-    numbered_labels: dict[str, int] = dc.field(init=False, default_factory=dict)
-    string_labels: dict[bytes, asm.LabelRef] = dc.field(init=False, default_factory=dict)
-    stack: StackPoint = dc.field(init=False, default=StackPoint())
-    allocated_arrays: list[ArrayRef] = dc.field(init=False, default_factory=list)
-    func_queue: deque[ConcreteSignature] = dc.field(init=False, default_factory=deque)
-    func_labels: dict[ConcreteSignature, asm.LabelRef] = dc.field(init=False, default_factory=dict)
+    stack: StackPoint                                          = dc.field(init=False, default=StackPoint())
+    allocated_arrays: list[ArrayRef]                           = dc.field(init=False, default_factory=list)
+    global_vars: dict[str, asm.Accessor|ArrayRef]              = dc.field(init=False, default_factory=dict)
+    local_vars: ChainMap[str, asm.Accessor|ArrayRef]           = dc.field(init=False, default_factory=ChainMap)
+    return_address: asm.Accessor                               = dc.field(init=False, default=None)
+
+    numbered_labels: dict[str, int]                            = dc.field(init=False, default_factory=dict)
+    string_labels: dict[bytes, asm.LabelRef]                   = dc.field(init=False, default_factory=dict)
+    const_data: dict[asm.LabelRef, asm.Directive]              = dc.field(init=False, default_factory=dict)
+    state_data: dict[asm.LabelRef, asm.Directive]              = dc.field(init=False, default_factory=dict)
+
+    func_queue: deque[ConcreteSignature]                       = dc.field(init=False, default_factory=deque)
+    func_labels: dict[ConcreteSignature, asm.LabelRef]         = dc.field(init=False, default_factory=dict)
     func_table: dict[ConcreteSignature, list[asm.Instruction]] = dc.field(init=False, default_factory=dict)
+    loop_info: deque[LoopInfo]                                 = dc.field(init=False, default_factory=deque)
 
     # TODO: I want to keep track of maximum static size (offset + static
     #  array size) seen for various checkpoints.
@@ -182,20 +201,22 @@ class CodeGen:
         yield from asm.ZeroDirective(asm.WordOffset(self.stack_size)).lines()
         yield b'.word all_is_win'
         yield b'stack_end:'
-        # emit mutable global variables
+        for label, directive in self.state_data.items():
+            yield from asm.Label(label).lines()
+            yield from directive.lines()
 
         yield b'%section const'
-        # emit const global variables, const array literals, and strings
-        # (const array literals might just become global variables)
-
         for string, label in self.string_labels.items():
             yield from asm.Label(label).lines()
             yield from asm.WordDirective(asm.IntLiteral(len(string))).lines()
             yield from asm.AsciiDirective(string).lines()
+        for label, directive in self.const_data.items():
+            yield from asm.Label(label).lines()
+            yield from directive.lines()
         yield b'%section code'
         for code in self.func_table.values():
             yield from asm.lines(code)
-        yield from asm.Metadata('Standard library routines:').lines()
+        # yield from asm.Metadata('Standard library routines:').lines()
         yield from stdlib.stdlib_lines
 
     def make_funcs(self):
@@ -213,17 +234,25 @@ class CodeGen:
 
     def gen_func(self, csig: ConcreteSignature, func: ast.FuncDeclaration):
         assert self.stack == StackPoint(0)
+        self.local_vars = ChainMap()
 
-        # Reserve space for RA
+        # Reserve space for RA and passed arguments
         bubble = self.reserve_word()
-        for arg_type in csig.arg_types:
-            # TODO: actually put them somewhere
-            bubble += self.reserve_type(arg_type)
+        self.return_address = bubble.value
+        for arg_type, param in zip(csig.arg_types, func.params, strict=True):
+            arg_bubble = self.reserve_type(arg_type)
+            self.local_vars[param.var.name] = arg_bubble.value
+            bubble += arg_bubble
 
         yield asm.Metadata(f'Function {func.signature}:')
         yield asm.Label(self.func_labels[csig])
         yield from self.gen_block(func.body)
 
+        # Return doesn't actually pop, it only restores ap.
+        # Here we pop the arguments that we reserved space for.  This
+        # should be equivalent to simply resetting self.stack.  No code
+        # will be generated to deallocate arrays as any arrays passed to
+        # the function belong to the caller.
         cleanup_args = list(self.pop(bubble))
         assert not cleanup_args, 'Should not require any instructions to be clean up arguments'
         assert self.stack == StackPoint(0)
@@ -231,28 +260,82 @@ class CodeGen:
     def gen_block(self, block: ast.Block):
         match block:
             case ast.CodeBlock():
+                start_point = self.stack
+                self.local_vars = self.local_vars.new_child()
                 yield asm.Metadata(add_indent=1)
-                yield from self.gen_stmts(block.stmts)
+
+                exited, bubble = yield from self.gen_stmts(block.stmts)
+
+                # So this is a little silly.  We don't want to generate
+                # cleanup code when the block does its own cleanup, ie
+                # if it exits.  We should be able to check exit_modes,
+                # which will give the best information, but for some
+                # reason I didn't include continue in exit_modes and I
+                # can't remember why.  So I'm
+                if exited or ExitMode.NONE not in block.exit_modes():
+                    # Run the cleanup code of the pop generator for the
+                    # purpose of bookkeeping, but discard instructions.
+                    list(self.pop(bubble))
+                else:
+                    yield from self.pop(bubble)
+
                 yield asm.Metadata(add_indent=-1)
+                self.local_vars = self.local_vars.parents
+                assert self.stack == start_point
             case ast.IfBlock():
+                else_label = self.add_label('else')
+                end_else = self.add_label('end_else')
                 yield asm.Metadata('if block')
-                raise NotImplementedError
+                yield from self.bool_expr_branch(block.cond, (), self.goto(else_label))
+                yield from self.gen_block(block.body)
+                # The goto is unnecessary if there's no else block.
+                # But I feel like this sort of thing would be dealt with
+                # better by a peephole optimizer.
+                yield from self.goto(end_else)
+                yield asm.Label(else_label)
+                yield from self.gen_block(block.else_block)
+                yield asm.Label(end_else)
             case ast.LoopBlock():
+                loop_start = self.add_label('loop')
+                loop_continue = self.add_label('continue')
+                loop_break = self.add_label('break')
                 yield asm.Metadata('loop block')
-                raise NotImplementedError
+                yield asm.Label(loop_start)
+                yield from self.bool_expr_branch(block.cond, (), self.goto(loop_break))
+                self.loop_info.append(LoopInfo(self.stack, loop_continue, loop_break))
+                yield from self.gen_block(block.body)
+                self.loop_info.pop()
+                yield asm.Label(loop_continue)
+                yield from self.gen_block(block.cont)
+                yield from self.goto(loop_start)
+                yield asm.Label(loop_break)
             case ast.TryBlock():
+                handler = self.add_label('try_handler')
+                end_try = self.add_label('end_try')
                 yield asm.Metadata('try block')
-                raise NotImplementedError
+                yield asm.Jump(handler)
+                yield from self.gen_block(block.body)
+                yield from self.goto(end_try)
+                yield asm.Label(handler)
+                yield from self.gen_block(block.handler)
+                yield asm.Label(end_try)
             case ast.UndoBlock():
                 yield asm.Metadata('undo block')
-                raise NotImplementedError
+                yield from self.gen_block(block.body)
             case ast.PreemptBlock():
+                do_preempt = self.add_label('do_preempt')
+                end_preempt = self.add_label('end_preempt')
                 yield asm.Metadata('preempt block')
-                raise NotImplementedError
+                yield asm.Jump(do_preempt)
+                yield from self.goto(end_preempt)
+                yield asm.Label(do_preempt)
+                yield from self.gen_block(block.body)
+                yield asm.Label(end_preempt)
             case unknown:
                 raise InternalCompilerError(f'Unrecognized block {unknown}')
 
-    def gen_stmts(self, stmts):
+    def gen_stmts(self, stmts)->asm.InstrGen[tuple[bool, Bubble]]:
+        var_bubble = Bubble(self.stack, self.stack)
         for stmt in stmts:
             yield asm.Metadata(f'Statement @ {stmt.span}: {stmt.__class__.__name__}')
             match stmt:
@@ -262,21 +345,49 @@ class CodeGen:
                 case ast.Block():
                     yield from self.gen_block(stmt)
                 case ast.Declaration():
-                    raise NotImplementedError
+                    bubble = yield from self.push_expr(self.r1, stmt.init)
+                    self.local_vars[stmt.var.name] = bubble.value
+                    var_bubble += bubble
                 case ast.Assignment():
-                    raise NotImplementedError
+                    if isinstance(stmt.lookup, ast.VariableLookup):
+                        if isinstance(stmt, ast.IncAssignment):
+                            stmt = stmt.type_equiv_assignment()
+                        is_global, access = self.lookup_var(stmt.lookup.var)
+                        value = yield from self.get_expr_value(self.r1, stmt.expr)
+                        yield from access.set(value)
+                    else:
+                        bin_op = None
+                        if isinstance(stmt, ast.IncAssignment):
+                            bin_op = stmt.bin_op
+                        assert isinstance(stmt.lookup, ast.ArrayLookup)
+                        raise NotImplementedError
                 case ast.ReturnStatement():
                     if stmt.value is not None:
-                        raise NotImplementedError
-                    yield asm.Lwso(self.r1, asm.State(self.fp), asm.WordOffset(-1))
-                    yield from self.goto(asm.State(self.r1))
-                    # TODO: we need to pop or something IDK
+                        retval = yield from self.get_expr_value(self.r0, stmt.value)
+                        ra = yield from self.return_address.get(self.r1)
+                        with self.at_offset(0):
+                            bubble = self.reserve_type(stmt.value.type)
+                            yield from bubble.value.set(retval)
+                    else:
+                        ra = yield from self.return_address.get(self.r1)
+                    # Deallocate all arrays currently in scope
+                    yield from self.reset_ap(0)
+                    # Jump to return address
+                    yield from self.goto(ra)
+                    return True, var_bubble
                 case ast.BreakStatement():
-                    raise NotImplementedError
+                    info = self.loop_info[-1]
+                    yield from self.reset_ap(info.restore_point.array_num)
+                    yield from self.goto(info.break_label)
+                    return True, var_bubble
                 case ast.ContinueStatement():
-                    raise NotImplementedError
+                    info = self.loop_info[-1]
+                    yield from self.reset_ap(info.restore_point.array_num)
+                    yield from self.goto(info.continue_label)
+                    return True, var_bubble
                 case unknown:
                     raise InternalCompilerError(f'Unrecognized statement {unknown}')
+        return False, var_bubble
 
     def push_expr(self, r_use: asm.LabelRef, expr: ast.Expression)->asm.InstrGen[ValueBubble]:
         expected_size = self.frame_size(expr.type)
@@ -320,6 +431,8 @@ class CodeGen:
             # because it makes dynamically deallocating arrays awkward.
             # Could make endianness configurable in Sphinx so we can use
             # big endian, but that'd make access_byte() a pain.
+            # TODO: I mean we could just deal with IntToByte by by doing
+            #  get_expr_value and pushing a byte for that...
             assert isinstance(bubble.value, asm.Accessor)
             value = yield from bubble.get_fast(r_use)
             yield from self.pop(bubble)
@@ -417,16 +530,28 @@ class CodeGen:
                 )
                 return bubble
             case ast.VariableLookup():
-                ...
-                raise NotImplementedError
+                is_global, access = self.lookup_var(expr.var)
+                if keep and is_global and not expr.var.const:
+                    # Array variables are always const, so this won't
+                    # be an ArrayRef
+                    assert isinstance(access, asm.Accessor)
+                    result = yield from access.get(r_out)
+                else:
+                    return self.vacpack(access)
             case ast.FuncCall():
                 return (yield from self.eval_func_call(expr.type, expr.func, expr.args))
             case ast.ArrayLiteral():
+                # If array is const and all values are primitive, we can
+                # just turn it into a const global.
+                if expr.type.const and all(isinstance(v, ast.PrimitiveValue) for v in expr.values):
+                    return self.vacpack(self.make_global(expr, const=True))
                 # If const and all elements static: new global, vac Bubble
                 # Else: evaluate all elements, +static_array_size, +offset
                 ...
                 raise NotImplementedError
             case ast.ArrayInitializer():
+                # TODO: looks like I'm not actually adding array to the
+                #  allocated_arrays list here -_-
                 # TODO: stack overflow and negative length detection
                 length_bubble = yield from self.push_expr(r_out, expr.length)
                 length = yield from length_bubble.get_fast(r_out)
@@ -445,8 +570,6 @@ class CodeGen:
                 ...
                 raise NotImplementedError
             case ast.LengthLookup():
-                # TODO: in the case that the bubble is on the stack, can
-                #  we just pop bubble and reserve word?
                 if isinstance(expr.source.type, ArrayType):
                     # bubble, ref = yield from self.get_array_reference(expr.source)
                     bubble = yield from self.eval_expr(r_out, expr.source, keep=False)
@@ -484,6 +607,13 @@ class CodeGen:
                 yield from self.pop(result)
             yield asm.Yield(asm.IntLiteral(ord('\n'), is_byte=True))
             return self.reserve_type(DataType.VOID)
+        elif name == ast.Ident.defeat('is_defeat') and len(args) == 0:
+            yield asm.Halt()
+            return self.reserve_type(DataType.VOID)
+        elif name == ast.Ident.defeat('truth_is_defeat') and len(args) == 1:
+            if args[0].type == DataType.BOOL:
+                yield from self.truth_is_defeat(args[0])
+                return self.reserve_type(DataType.VOID)
 
         end_call = self.add_label('end_call')
 
@@ -504,12 +634,109 @@ class CodeGen:
             bubble += arg_bubble
 
         label = self.label_for_func(ConcreteSignature(name, tuple(arg_types)))
-        yield asm.Sub(self.fp, asm.State(self.fp), asm.IntLiteral(offset))
+        yield asm.Add(self.fp, asm.State(self.fp), asm.IntLiteral(-offset))
         yield from self.goto(label)
         yield asm.Label(end_call)
         yield asm.Add(self.fp, asm.State(self.fp), asm.IntLiteral(offset))
         yield from self.pop(bubble)
         return self.reserve_type(ret_type)
+
+    def lookup_var(self, var: ast.Variable):
+        # Locals access always considered safe
+        if access := self.local_vars.get(var.name):
+            return False, access
+        # Add global variable if it doesn't exist
+        if not (access := self.global_vars.get(var.name)):
+            access = self.make_global(
+                self.global_decls[var.name].init,
+                var.const, label_prefix=f'var_{var.name}'
+            )
+        return True, access
+
+    def make_global(self, initializer: ast.Expression, const: bool, label_prefix='data') -> asm.Accessor | ArrayRef:
+        match initializer:
+            case ast.PrimitiveValue():
+                try:
+                    next(self.eval_expr(self.r1, initializer, keep=True))
+                except StopIteration as ret:
+                    assert ret.value.vacuous
+                    assert isinstance(ret.value.value, asm.Immediate)
+                    # Constant immediate values don't need to be stored
+                    # anywhere.  They may be used as is.
+                    if const:
+                        return ret.value.value
+                    label = self.add_label(label_prefix)
+                    if initializer.type.byte_sized:
+                        self.state_data[label] = asm.ByteDirective(ret.value.value)
+                        return asm.StateByte(label)
+                    else:
+                        self.state_data[label] = asm.WordDirective(ret.value.value)
+                        return asm.State(label)
+                assert False
+            case ast.ArrayInitializer():
+                if isinstance(initializer.length, ast.IntValue):
+                    return self.add_global_array(
+                        const, initializer.type.el_type, label_prefix,
+                        initializer.length.data, asm.ZeroDirective(
+                            asm.IntLiteral(self.array_size(
+                                initializer.type.el_type,
+                                initializer.length.data
+                            ))
+                        )
+                    )
+            case ast.ArrayLiteral():
+                # Using const=True relies on that we don't actually put
+                # const immediates into const
+                values = [self.make_global(v, const=True)
+                          for v in initializer.values]
+                assert all(isinstance(v, asm.Immediate) for v in values)
+                if initializer.type.el_type == DataType.BOOL:
+                    directive = asm.ByteDirective(*map(
+                        asm.IntLiteral,
+                        self.pack_bools([bool(lit.data) for lit in values])
+                    ))
+                elif initializer.type.el_type.byte_sized:
+                    directive = asm.ByteDirective(*values)
+                else:
+                    directive = asm.WordDirective(*values)
+
+                # Activate maximum paranoia mode
+                scale = {asm.WordDirective: self.word_size,
+                         asm.ByteDirective: 1}[type(directive)]
+                assert scale * len(directive.items) == self.array_size(
+                    initializer.type.el_type, len(values)
+                )
+
+                return self.add_global_array(
+                    const, initializer.type.el_type,
+                    label_prefix, len(values), directive
+                )
+        # We treat it as a CodeGenError rather than an internal error if
+        # we cannot evaluate the initializer at compile time, implying
+        # that it's the user's fault.
+        # Really the check for this stuff should be in the typechecker
+        # probably, but I don't think it does currently.
+        raise CodeGenError(
+            'Expression cannot be evaluated at compile time',
+            initializer.span
+        )
+
+    @staticmethod
+    def pack_bools(bools, *, bit_size=8):
+        result = []
+        for i, b in enumerate(bools):
+            bit = i % bit_size
+            if bit == 0:
+                result.append(0)
+            result[-1] |= b << bit
+        return result
+
+    def add_global_array(self, const, el_type: DataType, label_prefix, length, directive):
+        label = self.add_label(label_prefix)
+        data_dict = self.const_data if const else self.state_data
+        access = AccessMode.RC if const else AccessMode.RW
+        data_dict[label] = directive
+        return ArrayRef(ConcreteArrayType(el_type, access), label, asm.IntLiteral(length))
 
     def get_checked_index(self, r_idx_out: asm.LabelRef, idx_arg: asm.AssemblyExpression,
                           length_arg: asm.AssemblyExpression) -> asm.InstrGen[asm.AssemblyExpression]:
@@ -668,7 +895,7 @@ class CodeGen:
             if op_type in {ast.Div, ast.Mod}:
                 yield asm.Jump(div_allowed := self.add_label('div_allowed'))
                 yield asm.Hne(arg_right, asm.IntLiteral(0))
-                yield self.goto(stdlib.division_by_zero)
+                yield from self.goto(stdlib.division_by_zero)
                 yield asm.Label(div_allowed)
             yield instr(r_out, arg_left, arg_right)
         else:
@@ -806,12 +1033,6 @@ class CodeGen:
         ))
 
     def reserve_type(self, val_type: ConcreteType):
-        # TODO: looks like in stdlib I assumed length is at
-        #  lower address (top of stack), but in other stuff I
-        #  had other way around?  Which should I go with?
-        #  Here is assuming we go back to the convention where
-        #  address is at low address, but that would require
-        #  changing stdlib.
         if isinstance(val_type, ConcreteArrayType):
             length_bubble = self.reserve_word()
             origin_bubble = self.reserve_word()
@@ -896,3 +1117,23 @@ class CodeGen:
             yield from array.origin.to(self.ap)
         else:
             assert array_idx == len(self.allocated_arrays)
+
+    @contextlib.contextmanager
+    def at_offset(self, offset):
+        # Context manager for temporarily setting the stack to an offset
+        # Allows use of methods like reserve_type at arbitrary offsets
+        prev_stack = self.stack
+        new_stack = StackPoint(
+            offset=offset, array_num=prev_stack.array_num,
+            static_array_size=prev_stack.static_array_size
+        )
+        self.stack = new_stack
+
+        try:
+            yield
+        finally:
+            # It's ok to leave the offset wherever you like since we're
+            # resetting it, but any arrays that may have been allocated
+            # do need to be cleaned up.
+            assert not Bubble(new_stack, self.stack).has_array, 'stack not cleaned up'
+            self.stack = prev_stack

@@ -71,8 +71,8 @@ stdlib_lines = list(filter(None, textwrap.dedent("""
 
 
     print_const_byte_array:
-        lwso [r0], [fp], -2w
-        lwso [r1], [fp], -3w
+        lwso [r0], [fp], -3w
+        lwso [r1], [fp], -2w
         j print_string_loop
         halt
     print_string:
@@ -96,8 +96,8 @@ stdlib_lines = list(filter(None, textwrap.dedent("""
 
 
     print_state_byte_array:
-        lwso [r0], [fp], -2w
-        lwso [r1], [fp], -3w
+        lwso [r0], [fp], -3w
+        lwso [r1], [fp], -2w
         print_state_byte_array_loop:
         j print_string_done
         hle [r1], 0

@@ -1,9 +1,5 @@
 // Shor's algorithm?  More like snore's algorithm!
 
-// Note: not totally sure if this will work as I expect as I haven't
-// tried actually implementing it in Sphinx, but it's pretty similar to
-// the SAT one.
-
 
 // Return a number that divides n
 // Returns |n| if n is prime (or if |n| < 2)
@@ -16,10 +12,12 @@ int @divide(int n) {
         n = -n;
     }
 
-
     try {
         int result = 0;
-        for (int b = 1; b < n; b *= 2) {
+        int stop = n / 2;
+        for (int b = 1; b <= stop; b *= 2) {
+            // Loop through powers of 2, for each one adding it to our
+            // result number (setting the bit) if it is necessary.
             preempt {
                 result += b;
             }
@@ -31,24 +29,39 @@ int @divide(int n) {
             break;
         }
 
+        !truth_is_defeat(result <= 1);
         !truth_is_defeat(n % result != 0);
-        !truth_is_defeat(result == 1);
         return result;
     } undo {
         return n;
     }
 }
 
-bool @printFactors(int n) {
-    bool isPrime = true;
-    while (n > 1) {
-        int d = @divide(n);
-        if (d != n) {
-            isPrime = false;
-        }
-        println(d);
-        n /= d;
+
+bool @print_factors(int n) {
+    int d = @divide(n);
+    if (d == n) {
+        print(d);
+        return true;
     }
 
-    return isPrime;
+    print('(');
+    @print_factors(d);
+    print(" * ");
+    @print_factors(n / d);
+    print(')');
+    return false;
+}
+
+
+void @is_you() {
+    for (int i = 2; i < 20; i += 1) {
+        print("Factorization of ");
+        print(i);
+        print(": ");
+        if (@print_factors(i)) {
+            print(" -- it's prime!");
+        }
+        println();
+    }
 }
