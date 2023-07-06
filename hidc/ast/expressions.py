@@ -248,6 +248,9 @@ class FuncCall(Expression):
         try:
             func = env.funcs[sig]
         except KeyError:
+            # TODO: really, env.funcs should map function names to dicts
+            #  of function signatures to functions, so we don't need to
+            #  iterate over all possible functions, but this is fine...
             for sig, func in env.funcs.items():
                 if sig.name == self.func and len(sig.arg_types) == len(args):
                     for arg, sig_type in zip(args, sig.arg_types):
@@ -311,6 +314,14 @@ class IntValue(PrimitiveValue):
         if new_type == DataType.BOOL:
             return BoolValue(bool(self.data), self.span)
         elif new_type == DataType.BYTE:
+            # TODO: I feel that this should probably do self.data & 0xFF
+            #  but I'm not totally sure of the implications or if that
+            #  should be done elsewhere.
+            #  Should have result that 4 / (258 is byte) produces 2, as
+            #  it would if evaluated at runtime.
+            #  For that matter I should probably also track word size in
+            #  env and use it when evaluating IntValues to do a (signed)
+            #  wraparound.
             return ByteValue(self.data, self.span, implicit and self.literal)
         elif new_type == DataType.INT:
             return IntValue(self.data, self.span, implicit and self.literal)

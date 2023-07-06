@@ -164,7 +164,7 @@ class UnaryArithmeticOp(Unary, ArithmeticOp):
         arg = self.arg.evaluate(env)
         result = type(self)(
             self.op_span, arg.coerce(DataType.INT)
-        )
+        ).simplify()
 
         if arg.type == DataType.BYTE:
             if result.coercible(DataType.BYTE):

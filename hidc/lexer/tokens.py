@@ -158,6 +158,10 @@ class DataType(EnumToken):
     STRING = 'string'
     VOID = 'void'
 
+    @property
+    def byte_sized(self):
+        return self in {DataType.BYTE, DataType.BOOL}
+
 
 @include_enum
 class BoolToken(EnumToken):

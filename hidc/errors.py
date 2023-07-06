@@ -57,5 +57,6 @@ class CodeGenError(CompilerError):
     pass
 
 # TODO: when or if should this replace assertions?
+#  Also possibly InternalCompilerError could have an optional span
 class InternalCompilerError(Exception):
     pass

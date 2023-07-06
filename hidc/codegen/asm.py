@@ -1,7 +1,29 @@
 # from hidc.utils.data_abc import DataABC, Abstract
+from hidc.errors import InternalCompilerError
 from abc import ABC, abstractmethod
 import dataclasses as dc
-from typing import ClassVar
+import typing as ty
+import enum
+
+
+def lines(directives):
+    iterator = iter(directives)
+    indent = 0
+    while True:
+        try:
+            directive = next(iterator)
+        except StopIteration as ret:
+            return ret.value
+
+        asm = list(directive.lines())
+        if isinstance(directive, Metadata):
+            indent += directive.data.get('add_indent', 0)
+
+            if span := directive.data.get('span', None):
+                asm.insert(0, f'; Starting {span.start}'.encode('utf-8'))
+
+        for line in asm:
+            yield b'    ' * indent + line
 
 
 def _escape_bytes(data, quote):
@@ -13,7 +35,7 @@ def _escape_bytes(data, quote):
             result += b'\\' + bytes([byte])
         elif byte in b'\n':
             result += b'\\n'
-        elif byte in b'\\r':
+        elif byte in b'\r':
             result += b'\\r'
         elif 0x20 <= byte <= 0x7e:
             result += bytes([byte])
@@ -21,11 +43,44 @@ def _escape_bytes(data, quote):
             result += b'\\x' + f'{byte:02x}'.encode('utf-8')
     return result
 
+_T = ty.TypeVar('_T')
+InstrGen = ty.Generator['Instruction', None, _T]
 
-class AssemblyExpression(ABC):
+class Accessor(ABC):
+    @abstractmethod
+    def get(self, r_out: 'LabelRef') -> InstrGen['AssemblyExpression']:
+        # Returns an AssemblyExpression which may be used to reference
+        # the value stored in the Accessor.  This may be written to the
+        # word at r_out in state, but not necessarily.  Nothing else in
+        # memory will be written to.
+        yield from ()
+
+    def to(self, r_out: 'LabelRef'):
+        # For when you DO actually definitely want to write the value to
+        # a particular address and not just get an AssemblyExpression.
+        result = yield from self.get(r_out)
+        # State.set doesn't do a mov if result == State(r_out)
+        # so this won't write unless it's necessary
+        yield from State(r_out).set(result)
+
+    def set(self, source: 'AssemblyExpression'):
+        # Write the value from the source into the accessor.
+        yield from ()
+        raise InternalCompilerError(f'{self.__class__.__name__} not writable')
+
+    def access_byte(self) -> 'Accessor':
+        # Transform to byte access if possible
+        return self
+
+
+class AssemblyExpression(Accessor):
     @abstractmethod
     def __bytes__(self):
         pass
+
+    def get(self, r_out):
+        yield from ()
+        return self
 
 @dc.dataclass(frozen=True)
 class SpecialArg(AssemblyExpression):
@@ -34,7 +89,9 @@ class SpecialArg(AssemblyExpression):
         return self.asm
 
 class Immediate(AssemblyExpression):
-    pass
+    def access_byte(self):
+        # No point in implementing, but sure why not...
+        return SpecialArg(b'(' + bytes(self) + b') & 0xFF')
 
 @dc.dataclass(frozen=True)
 class LabelRef(Immediate):
@@ -52,6 +109,9 @@ class IntLiteral(Immediate):
             return b"'" + _escape_bytes(bytes([self.data]), b"'") + b"'"
         return str(self.data).encode('utf-8')
 
+    def access_byte(self):
+        return IntLiteral(self.data & 0xFF, self.is_byte)
+
 @dc.dataclass(frozen=True)
 class WordOffset(Immediate):
     words: int
@@ -64,53 +124,116 @@ class State(AssemblyExpression):
     def __bytes__(self):
         return b'[' + bytes(self.immed) + b']'
 
+    def set(self, source):
+        if source != self:
+            yield Mov(self.immed, source)
+
+    def access_byte(self) -> 'Accessor':
+        return StateByte(self.immed)
+
 @dc.dataclass(frozen=True)
 class Const(AssemblyExpression):
     immed: Immediate
     def __bytes__(self):
         return b'{' + bytes(self.immed) + b'}'
 
+    def access_byte(self) -> 'Accessor':
+        return ConstByte(self.immed)
+
+@dc.dataclass(frozen=True)
+class StateByte(Accessor):
+    immed: Immediate
+    def get(self, r_out: 'LabelRef') -> InstrGen['AssemblyExpression']:
+        yield Lbs(r_out, self.immed)
+        return State(r_out)
+
+    def set(self, source: 'AssemblyExpression'):
+        yield Sbs(self.immed, source)
+
+@dc.dataclass(frozen=True)
+class ConstByte(Accessor):
+    immed: Immediate
+    def get(self, r_out: 'LabelRef') -> InstrGen['AssemblyExpression']:
+        yield Lbc(r_out, self.immed)
+        return State(r_out)
+
+@dc.dataclass(frozen=True)
+class Indirect(Accessor):
+    section: 'Section'
+    base: AssemblyExpression
+    offset: AssemblyExpression = IntLiteral(0)
+    def get(self, r_out: 'LabelRef') -> InstrGen['AssemblyExpression']:
+        yield self.section.lwo(r_out, self.base, self.offset)
+        return State(r_out)
+
+    def set(self, source: 'AssemblyExpression'):
+        yield self.section.swo(self.base, self.offset, source)
+
+    def access_byte(self) ->'Accessor':
+        return IndirectByte(self.section, self.base, self.offset)
+
+@dc.dataclass(frozen=True)
+class IndirectByte(Accessor):
+    section: 'Section'
+    base: AssemblyExpression
+    offset: AssemblyExpression = IntLiteral(0)
+
+    def get(self, r_out: 'LabelRef') -> InstrGen['AssemblyExpression']:
+        yield self.section.lbo(r_out, self.base, self.offset)
+        return State(r_out)
+
+    def set(self, source: 'AssemblyExpression'):
+        yield self.section.sbo(self.base, self.offset, source)
+
+class VoidAccessor(Accessor):
+    def get(self, r_out: 'LabelRef') -> InstrGen['AssemblyExpression']:
+        yield from ()
+        raise InternalCompilerError('Value was void')
+
+
 class Directive(ABC):
     @abstractmethod
-    def __bytes__(self):
-        pass
+    def lines(self):
+        yield from ()
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class Label(Directive):
     label: LabelRef
-    def __bytes__(self):
-        return bytes(self.label) + b':'
+    def lines(self):
+        yield bytes(self.label) + b':'
 
-@dc.dataclass(frozen=True)
-class Comment(Directive):
-    text: str
-    def __bytes__(self):
-        return b'\n'.join(
-            b'; ' + line.encode('utf-8')
-            for line in self.text.splitlines()
-        )
+@dc.dataclass
+class Metadata(Directive):
+    data: dict = dc.field(init=False)
 
+    def __init__(self, comment=None, **data):
+        if comment is not None:
+            data['comment'] = comment
+        self.data = data
 
-# TODO: indent will probably need to be stored in the instructions
-#  themselves after all :(
-#  Or maybe directives for increase indent, decrease indent, which would
-#  be similar to Comment
-#  A peephole optimizer would ignore both comments and indent directives
+    def lines(self):
+        if 'comment' in self.data:
+            for line in self.data['comment'].splitlines():
+                yield b'; ' + line.encode('utf-8')
+
 class Instruction(Directive):
-    code: ClassVar[bytes]
+    code: ty.ClassVar[bytes]
 
     @property
     def args(self):
         return tuple(getattr(self, field.name) for field in dc.fields(self))
 
-    def __bytes__(self):
-        return b' '.join([self.code, *map(bytes, self.args)])
+    def lines(self):
+        if not self.args:
+            yield self.code
+        else:
+            yield self.code + b' ' + b', '.join(map(bytes, self.args))
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class DestInstruction(Instruction):
     dest: AssemblyExpression
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class ImmedDestInstruction(DestInstruction):
     dest: Immediate
     @property
@@ -122,11 +245,11 @@ class ImmedDestInstruction(DestInstruction):
             *[getattr(self, field.name) for field in fields[1:]]
         )
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class Halt(Instruction):
     code = b'halt'
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class ConditionalHalt(Instruction):
     left: AssemblyExpression
     right: AssemblyExpression
@@ -149,12 +272,12 @@ class Hle(ConditionalHalt):
 class Hge(ConditionalHalt):
     code = b'hge'
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class Jump(Instruction):
     code = b'j'
     addr: AssemblyExpression
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class ArithmeticInstruction(ImmedDestInstruction):
     left: AssemblyExpression
     right: AssemblyExpression
@@ -189,12 +312,15 @@ class Asl(ArithmeticInstruction):
 class Asr(ArithmeticInstruction):
     code = b'asr'
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class Mov(ImmedDestInstruction):
     code = b'mov'
     value: AssemblyExpression
 
-@dc.dataclass(frozen=True)
+# TODO: Possibly make offset an optional argument of LoadInstruction
+#  which generates appropriate LoadOffsetInstruction or something rather
+#  than separating.  Same for StoreInstruction, but that's more awkward.
+@dc.dataclass
 class LoadInstruction(ImmedDestInstruction):
     source: AssemblyExpression
 
@@ -210,7 +336,7 @@ class Lbs(LoadInstruction):
 class Lbc(LoadInstruction):
     code = b'lbc'
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class LoadOffsetInstruction(ImmedDestInstruction):
     source: AssemblyExpression
     offset: AssemblyExpression
@@ -227,7 +353,7 @@ class Lbso(LoadOffsetInstruction):
 class Lbco(LoadOffsetInstruction):
     code = b'lbco'
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class StoreInstruction(DestInstruction):
     value: AssemblyExpression
 
@@ -237,7 +363,7 @@ class Sws(StoreInstruction):
 class Sbs(StoreInstruction):
     code = b'sbs'
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class StoreOffsetInstruction(DestInstruction):
     offset: AssemblyExpression
     value: AssemblyExpression
@@ -248,45 +374,52 @@ class Swso(StoreOffsetInstruction):
 class Sbso(StoreOffsetInstruction):
     code = b'sbso'
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class Yield(Instruction):
     code = b'yield'
     output: AssemblyExpression
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class Sleep(Instruction):
     code = b'sleep'
     duration: AssemblyExpression
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class Flag(Instruction):
     code = b'flag'
     flag: SpecialArg
 
 
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class AsciiDirective(Directive):
     data: bytes
 
-    def __bytes__(self):
-        return b'.ascii "' + _escape_bytes(self.data, b'"') + b'"'
+    def lines(self):
+        yield b'.ascii "' + _escape_bytes(self.data, b'"') + b'"'
 
-# TODO: support multiple words/bytes in single directive
-@dc.dataclass(frozen=True)
+@dc.dataclass
 class WordDirective(Directive):
-    word: Immediate
+    words: tuple[Immediate, ...] = dc.field(init=False)
 
-    def __bytes__(self):
-        return b'.word ' + bytes(self.word)
+    def __init__(self, *words: Immediate):
+        self.words = words
 
-@dc.dataclass(frozen=True)
+    def lines(self):
+        if len(self.words) >= 1:
+            yield b'.word ' + b', '.join(bytes(word) for word in self.words)
+
+@dc.dataclass
 class ByteDirective(Directive):
-    byte: Immediate
+    bytes: tuple[Immediate, ...] = dc.field(init=False)
 
-    def __bytes__(self):
-        return b'.byte ' + bytes(self.byte)
+    def __init__(self, *bytes: Immediate):
+        self.bytes = bytes
 
-@dc.dataclass(frozen=True)
+    def lines(self):
+        if len(self.bytes) >= 1:
+            yield b'.byte ' + b', '.join(bytes(byte) for byte in self.bytes)
+
+@dc.dataclass
 class ZeroDirective(Directive):
     size: Immediate
 
@@ -298,5 +431,33 @@ class ZeroDirective(Directive):
     def words(cls, size):
         return cls(WordOffset(size))
 
-    def __bytes__(self):
-        return b'.zero ' + bytes(self.size)
+    def lines(self):
+        yield b'.zero ' + bytes(self.size)
+
+def _store_const(*_):
+    raise InternalCompilerError('Cannot store in const section')
+
+_T_word = ty.Callable[[Immediate], AssemblyExpression]
+_T_byte = ty.Callable[[Immediate], Accessor]
+_T_l = ty.Callable[[Immediate, AssemblyExpression], LoadInstruction]
+_T_lo = ty.Callable[[Immediate, AssemblyExpression, AssemblyExpression], LoadOffsetInstruction]
+_T_s = ty.Callable[[AssemblyExpression, AssemblyExpression], StoreInstruction]
+_T_so = ty.Callable[[AssemblyExpression, AssemblyExpression, AssemblyExpression], StoreOffsetInstruction]
+
+class Section(enum.Enum):
+    CONST = (Const, ConstByte, Lwc, Lwco, Lbc, Lbco, _store_const, _store_const, _store_const, _store_const)
+    STATE = (State, StateByte, Lws, Lwso, Lbs, Lbso, Sws, Swso, Sbs, Sbso)
+
+    def __init__(self, word: _T_word, byte: _T_byte,
+                 lw: _T_l, lwo: _T_lo, lb: _T_l, lbo: _T_lo,
+                 sw: _T_s, swo: _T_so, sb: _T_s, sbo: _T_so):
+        self.word = word
+        self.byte = byte
+        self.lw = lw
+        self.lwo = lwo
+        self.lb = lb
+        self.lbo = lbo
+        self.sw = sw
+        self.swo = swo
+        self.sb = sb
+        self.sbo = sbo
