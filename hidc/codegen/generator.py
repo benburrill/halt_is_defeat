@@ -563,13 +563,72 @@ class CodeGen:
                 # just turn it into a const global.
                 if expr.type.const and all(isinstance(v, ast.PrimitiveValue) for v in expr.values):
                     return self.vacpack(self.make_global(expr, const=True))
-                # Else: evaluate all elements, +static_array_size, +array_num, +offset
-                ...
-                raise NotImplementedError
+
+                # TODO: we may need to ensure length is not TOO long,
+                #  depending on how the stack overflow detection works.
+                length = len(expr.values)
+                el_type = expr.type.el_type
+                length_bubble = self.reserve_word()
+                yield from length_bubble.value.set(asm.IntLiteral(length))
+                length_bubble = length_bubble.with_value(asm.IntLiteral(length))
+                origin_bubble = self.reserve_word()
+                yield from origin_bubble.value.set(asm.State(self.ap))
+                static_size = self.array_size(el_type, length)
+                # We must advance ap before, not after we write values
+                # It should be fine not to update self.stack yet though.
+                yield asm.Metadata('Array allocation (ArrayLiteral)')
+                yield asm.Add(self.ap, asm.State(self.ap), asm.IntLiteral(static_size))
+                if el_type == DataType.BOOL:
+                    foundation = self.pack_bools([
+                        isinstance(el_expr, ast.BoolValue) and el_expr.data
+                        for el_expr in expr.values
+                    ])
+
+                    # TODO: clean this mess of a loop up
+                    #  Also would be good to avoid the store and load in
+                    #  more cases than just the first time.
+                    offset = -static_size
+                    for byte in foundation:
+                        prev = asm.IntLiteral(byte)
+                        for i, el_expr in zip(range(8), expr.values):
+                            if not isinstance(el_expr, ast.BoolValue):
+                                if not isinstance(prev, asm.IntLiteral):
+                                    yield asm.Sbso(asm.State(self.ap), asm.IntLiteral(offset), prev)
+                                element = yield from self.get_expr_value(self.r0, el_expr)
+                                if i != 0:
+                                    yield asm.Asl(self.r0, element, asm.IntLiteral(i))
+                                    element = asm.State(self.r0)
+                                if not isinstance(prev, asm.IntLiteral):
+                                    yield asm.Lbso(self.r1, asm.State(self.ap), asm.IntLiteral(offset))
+                                    prev = asm.State(self.r1)
+                                yield asm.Or(self.r1, prev, element)
+                                prev = asm.State(self.r1)
+                        yield asm.Sbso(asm.State(self.ap), asm.IntLiteral(offset), prev)
+                        offset += 1
+                    assert offset == 0
+                else:
+                    if el_type.byte_sized:
+                        stride = 1
+                        so_instr = asm.Sbso
+                    else:
+                        stride = self.word_size
+                        so_instr = asm.Swso
+
+                    offset = -static_size
+                    for el_expr in expr.values:
+                        element = yield from self.get_expr_value(r_out, el_expr)
+                        yield so_instr(asm.State(self.ap), asm.IntLiteral(offset), element)
+                        offset += stride
+                    assert offset == 0
+
+                access_mode = AccessMode.R if expr.type.const else AccessMode.RW
+                return self.create_new_stack_array(
+                    ConcreteArrayType(expr.type.el_type, access_mode),
+                    origin_bubble=origin_bubble, length_bubble=length_bubble,
+                    static_size=static_size
+                )
             case ast.ArrayInitializer():
-                # TODO: looks like I'm not actually adding array to the
-                #  allocated_arrays list here -_-
-                # TODO: stack overflow and negative length detection
+                # TODO: stack overflow / negative length detection
                 length_bubble = yield from self.push_expr(r_out, expr.length)
                 length = yield from length_bubble.get_fast(r_out)
                 origin_bubble = self.reserve_word()
@@ -1157,10 +1216,9 @@ class CodeGen:
 
     def create_new_stack_array(self, val_type: ConcreteArrayType,
                                origin_bubble, length_bubble,
-                               static_length=None):
-        if static_length is not None:
-            assert static_length == length_bubble.value.length.data
-            static_size = self.array_size(val_type.el_type, static_length)
+                               static_size=None):
+        if static_size is not None:
+            assert static_size == self.array_size(val_type.el_type, length_bubble.value.data)
         else:
             static_size = 0
         bubble: Bubble = length_bubble + origin_bubble
