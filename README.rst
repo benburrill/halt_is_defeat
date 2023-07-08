@@ -64,8 +64,8 @@ Running under ``spasm`` produces the expected output:
         CPU time: 633 clock cycles
         Emulator efficiency: 45.61%
 
-If you run it yourself, you may notice something a little odd.  Once it
-reaches the end of the program, it gets stuck in an infinite loop.
+If you run it yourself, you may notice something a little odd.  Once the
+end of the program is reached, it gets stuck in an infinite loop.
 
 This behavior is necessary in order for Halt is Defeat to ensure that
 your programs are undefeatable.  Since "Halt is Defeat", the program
@@ -113,6 +113,10 @@ provides an undo block for this purpose.
 
 Halting problems
 ----------------
+The undo block allows us to do some rather interesting things.  If we
+modify the above code by putting a loop before the ``!is_defeat()``, the
+code will test if the loop will terminate, since defeat would never
+occur if the loop runs forever:
 
 .. code::
 
@@ -126,9 +130,27 @@ Halting problems
         }
     }
 
-Now of course, this has the unavoidable side-effect of actually running
-the loop if it is determined to run forever, but at least we can inform
-the user in advance.
+Output (it never reaches win because it is stuck in the loop):
+
+.. code::
+
+    $ hidc halting.hid -o halting.s
+    $ spasm halting.s
+    The loop runs forever
+
+
+*Hold on a moment... the halting problem of Turing machines is
+undecidable, and HiD seems Turing-complete-ish, so what gives?*
+
+For more information on what's really going on here, see
+https://github.com/benburrill/sphinx, but to provide some small comfort
+that this isn't flagrantly impossible, Sphinx is not Turing complete.
+It is "Turing-complete-ish" (just like your computer is), but that only
+means its halting problem is generally intractable, not undecidable.
+
+Sphinx's entire execution is based around this.  The instruction set
+provides only a single jump instruction, the "Turing jump instruction",
+which performs a jump if not jumping would lead to halting.
 
 
 Computational astrology
