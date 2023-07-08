@@ -290,9 +290,9 @@ class CodeGen:
                 if exited or ExitMode.NONE not in block.exit_modes():
                     # Run the cleanup code of the pop generator for the
                     # purpose of bookkeeping, but discard instructions.
-                    list(self.pop(bubble))
+                    list(self.pop(bubble, static=False))
                 else:
-                    yield from self.pop(bubble)
+                    yield from self.pop(bubble, static=False)
 
                 yield asm.Metadata(add_indent=-1)
                 self.local_vars = self.local_vars.parents
@@ -575,14 +575,15 @@ class CodeGen:
                 origin_bubble = self.reserve_word()
                 yield from origin_bubble.value.set(asm.State(self.ap))
                 size = yield from self.get_array_size(r_out, expr.type.el_type, length)
+                yield asm.Metadata('Array allocation (ArrayInitializer)')
                 yield asm.Add(self.ap, asm.State(self.ap), size)
                 # It should always be RW, but we'll leave it up to the
                 # typechecker to make such decisions.
                 access_mode = AccessMode.R if expr.type.const else AccessMode.RW
-                return (length_bubble + origin_bubble).with_value(ArrayRef(
+                return self.create_new_stack_array(
                     ConcreteArrayType(expr.type.el_type, access_mode),
-                    origin_bubble.value, length_bubble.value
-                ))
+                    origin_bubble=origin_bubble, length_bubble=length_bubble
+                )
             case ast.ArrayLookup():
                 yield from self.array_lookup(r_out, expr.source, expr.index)
             case ast.LengthLookup():
@@ -1122,6 +1123,8 @@ class CodeGen:
         ))
 
     def reserve_type(self, val_type: ConcreteType):
+        # NOTE: reserving an array type does NOT allocate the array
+        # Use create_new_stack_array for that.
         if isinstance(val_type, ConcreteArrayType):
             length_bubble = self.reserve_word()
             origin_bubble = self.reserve_word()
@@ -1151,6 +1154,23 @@ class CodeGen:
         else:
             yield asm.Mul(r_out, length, asm.IntLiteral(self.frame_size(data_type)))
         return asm.State(r_out)
+
+    def create_new_stack_array(self, val_type: ConcreteArrayType,
+                               origin_bubble, length_bubble,
+                               static_length=None):
+        if static_length is not None:
+            assert static_length == length_bubble.value.length.data
+            static_size = self.array_size(val_type.el_type, static_length)
+        else:
+            static_size = 0
+        bubble: Bubble = length_bubble + origin_bubble
+        assert bubble.cur == self.stack
+        cur = bubble.cur.add(array_num=1, static_array_size=static_size)
+        ref = ArrayRef(val_type, origin=origin_bubble.value, length=length_bubble.value)
+        self.allocated_arrays.append(ref)
+        self.stack = cur
+        assert len(self.allocated_arrays) == self.stack.array_num
+        return ValueBubble(bubble.prev, cur, ref)
 
     def frame_size(self, val_type):
         if isinstance(val_type, ArrayType|ConcreteArrayType):
@@ -1192,6 +1212,7 @@ class CodeGen:
                 for array in self.allocated_arrays[bubble.prev.array_num:]
             )
             if diff != 0:
+                yield asm.Metadata(f'Deallocate {bubble.array_allocations} arrays statically')
                 yield asm.Sub(self.ap, asm.State(self.ap), asm.IntLiteral(diff))
         else:
             yield from self.reset_ap(bubble.prev.array_num)
@@ -1201,11 +1222,15 @@ class CodeGen:
     def reset_ap(self, array_idx):
         # Dynamically reset ap to before the array at array_idx in
         # allocated_arrays was allocated.
-        if array_idx < len(self.allocated_arrays):
+        # Does NOT modify self.stack / self.allocated_arrays
+        cur_arrays = len(self.allocated_arrays)
+        if array_idx < cur_arrays:
+            num_arrays = cur_arrays - array_idx
+            yield asm.Metadata(f'Deallocate {num_arrays} arrays dynamically')
             array = self.allocated_arrays[array_idx]
             yield from array.origin.to(self.ap)
         else:
-            assert array_idx == len(self.allocated_arrays)
+            assert array_idx == cur_arrays
 
     @contextlib.contextmanager
     def at_offset(self, offset):
