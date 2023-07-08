@@ -263,14 +263,26 @@ class Hne(ConditionalHalt):
 class Hlt(ConditionalHalt):
     code = b'hlt'
 
+class Hltu(ConditionalHalt):
+    code = b'hltu'
+
 class Hgt(ConditionalHalt):
     code = b'hgt'
+
+class Hgtu(ConditionalHalt):
+    code = b'hgtu'
 
 class Hle(ConditionalHalt):
     code = b'hle'
 
+class Hleu(ConditionalHalt):
+    code = b'hleu'
+
 class Hge(ConditionalHalt):
     code = b'hge'
+
+class Hgeu(ConditionalHalt):
+    code = b'hgeu'
 
 @dc.dataclass
 class Jump(Instruction):

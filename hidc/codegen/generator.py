@@ -21,6 +21,14 @@ class ArrayRef:
     def section(self):
         return self.type.access.section
 
+    def make_const(self):
+        if self.type.access == AccessMode.RW:
+            return ArrayRef(
+                ConcreteArrayType(self.type.el_type, AccessMode.R),
+                origin=self.origin, length=self.length
+            )
+        return self
+
 
 @dc.dataclass(frozen=True)
 class StackPoint:
@@ -127,7 +135,9 @@ compare_map = {
 halt_inversion = {
     asm.Heq: asm.Hne, asm.Hne: asm.Heq,
     asm.Hlt: asm.Hge, asm.Hgt: asm.Hle,
-    asm.Hle: asm.Hgt, asm.Hge: asm.Hlt
+    asm.Hle: asm.Hgt, asm.Hge: asm.Hlt,
+    asm.Hltu: asm.Hgeu, asm.Hgtu: asm.Hleu,
+    asm.Hleu: asm.Hgtu, asm.Hgeu: asm.Hltu
 }
 
 
@@ -170,14 +180,17 @@ class CodeGen:
         if self.word_size < 2:
             raise CodeGenError('Word size must be at least 2 bytes', ())
 
+        if ((self.stack_size + 5) * self.word_size) > self.max_signed:
+            raise CodeGenError('Stack size too large', ())
+
         if not self.func_decls.get(ast.Ident.you('is_you'), {}).get(()):
-            raise CodeGenError('Missing @is_you()', ())
+            raise CodeGenError('Level is empty, expected entry point @is_you()', ())
 
         self.func_labels.update(stdlib.stdlib_funcs)
         self.label_for_func(ConcreteSignature(ast.Ident.you('is_you'), ()))
 
     @classmethod
-    def from_program(cls, program: ast.Program, word_size=2):
+    def from_program(cls, program: ast.Program, word_size, stack_size):
         func_decls = {}
         var_decls = {}
         for func_decl in program.func_decls:
@@ -185,7 +198,7 @@ class CodeGen:
             func_decls.setdefault(func_decl.name, {})[param_types] = func_decl
         for var_decl in program.var_decls:
             var_decls[var_decl.var.name] = var_decl
-        return cls(func_decls, var_decls, word_size)
+        return cls(func_decls, var_decls, word_size, stack_size)
 
     def generate(self):
         self.make_funcs()
@@ -223,6 +236,8 @@ class CodeGen:
         while self.func_queue:
             csig = self.func_queue.pop()
             abstract_types = tuple(
+                # TODO: maybe property abstract_type on concrete types?
+                #  (including DataType), maybe even on ArrayType as well
                 t if isinstance(t, DataType)
                 else ArrayType(t.el_type, t.access != AccessMode.RW)
                 for t in csig.arg_types
@@ -349,6 +364,7 @@ class CodeGen:
                     self.local_vars[stmt.var.name] = bubble.value
                     var_bubble += bubble
                 case ast.Assignment():
+                    # This includes both regular and IncAssignments
                     if isinstance(stmt.lookup, ast.VariableLookup):
                         if isinstance(stmt, ast.IncAssignment):
                             stmt = stmt.type_equiv_assignment()
@@ -360,7 +376,10 @@ class CodeGen:
                         if isinstance(stmt, ast.IncAssignment):
                             bin_op = stmt.bin_op
                         assert isinstance(stmt.lookup, ast.ArrayLookup)
-                        raise NotImplementedError
+                        yield from self.array_assignment(
+                            stmt.lookup.source, stmt.lookup.index,
+                            stmt.expr, bin_op
+                        )
                 case ast.ReturnStatement():
                     if stmt.value is not None:
                         retval = yield from self.get_expr_value(self.r0, stmt.value)
@@ -466,12 +485,15 @@ class CodeGen:
                 result = asm.IntLiteral(int(expr.data))
             case ast.StringValue():
                 result = self.label_for_string(expr.data)
-            case ast.BoolToByte() | ast.ByteToInt() | ast.Volatile():
-                return (yield from self.eval_expr(r_out, expr, keep))
+            case ast.BoolToByte() | ast.ByteToInt():
+                return (yield from self.eval_expr(r_out, expr.expr, keep))
+            case ast.Volatile():
+                bubble = yield from self.eval_expr(r_out, expr.expr, keep)
+                return bubble.with_value(bubble.value.make_const())
             case ast.IntToByte():
                 # In many cases, f(word) = f(byte) (mod 256)
                 # but we can't rely on that in general -- add option?
-                bubble = yield from self.eval_expr(r_out, expr, keep)
+                bubble = yield from self.eval_expr(r_out, expr.expr, keep)
                 # Notice that the bubble has not changed size, we have
                 # only switched to byte access.
                 return bubble.with_value(bubble.value.access_byte())
@@ -488,15 +510,11 @@ class CodeGen:
                 # The halt propagation here requires value in r_out
                 yield from value.to(r_out)
 
-                # Unsigned comparisons would be nice...  They would let
-                # us skip the Mov if it's already 1 and also have only a
-                # single halt propagation instruction.
                 yield asm.Jump(bool_normalized)
-                yield asm.Heq(asm.State(r_out), asm.IntLiteral(0))
+                yield asm.Hleu(asm.State(r_out), asm.IntLiteral(1))
                 yield asm.Mov(r_out, asm.IntLiteral(1))
                 yield asm.Label(bool_normalized)
-                yield asm.Hlt(asm.State(r_out), asm.IntLiteral(0))
-                yield asm.Hgt(asm.State(r_out), asm.IntLiteral(1))
+                yield asm.Hgtu(asm.State(r_out), asm.IntLiteral(1))
             case ast.StringToByteArray():
                 bubble = self.reserve_type(ConcreteArrayType(
                     DataType.BYTE, AccessMode.RC
@@ -545,8 +563,7 @@ class CodeGen:
                 # just turn it into a const global.
                 if expr.type.const and all(isinstance(v, ast.PrimitiveValue) for v in expr.values):
                     return self.vacpack(self.make_global(expr, const=True))
-                # If const and all elements static: new global, vac Bubble
-                # Else: evaluate all elements, +static_array_size, +offset
+                # Else: evaluate all elements, +static_array_size, +array_num, +offset
                 ...
                 raise NotImplementedError
             case ast.ArrayInitializer():
@@ -567,8 +584,7 @@ class CodeGen:
                     origin_bubble.value, length_bubble.value
                 ))
             case ast.ArrayLookup():
-                ...
-                raise NotImplementedError
+                yield from self.array_lookup(r_out, expr.source, expr.index)
             case ast.LengthLookup():
                 if isinstance(expr.source.type, ArrayType):
                     # bubble, ref = yield from self.get_array_reference(expr.source)
@@ -647,10 +663,18 @@ class CodeGen:
             return False, access
         # Add global variable if it doesn't exist
         if not (access := self.global_vars.get(var.name)):
+            # Kinda awkward...  Not sure I like how make_global's const
+            # works.  Maybe for arrays it should look ignore passed
+            # const and look only at expr.type.const?  IDK.
+            if isinstance(var.type, ArrayType):
+                const = var.type.const
+            else:
+                const = var.const
             access = self.make_global(
                 self.global_decls[var.name].init,
-                var.const, label_prefix=f'var_{var.name}'
+                const, label_prefix=f'var_{var.name}'
             )
+            self.global_vars[var.name] = access
         return True, access
 
     def make_global(self, initializer: ast.Expression, const: bool, label_prefix='data') -> asm.Accessor | ArrayRef:
@@ -675,13 +699,11 @@ class CodeGen:
                 assert False
             case ast.ArrayInitializer():
                 if isinstance(initializer.length, ast.IntValue):
+                    el_type = initializer.type.el_type
+                    length = initializer.length.data & self.max_unsigned
                     return self.add_global_array(
-                        const, initializer.type.el_type, label_prefix,
-                        initializer.length.data, asm.ZeroDirective(
-                            asm.IntLiteral(self.array_size(
-                                initializer.type.el_type,
-                                initializer.length.data
-                            ))
+                        const, el_type, label_prefix, length, asm.ZeroDirective(
+                            asm.IntLiteral(self.array_size(el_type, length))
                         )
                     )
             case ast.ArrayLiteral():
@@ -732,48 +754,12 @@ class CodeGen:
         return result
 
     def add_global_array(self, const, el_type: DataType, label_prefix, length, directive):
+        length = min(length, self.max_length(el_type))
         label = self.add_label(label_prefix)
         data_dict = self.const_data if const else self.state_data
         access = AccessMode.RC if const else AccessMode.RW
         data_dict[label] = directive
         return ArrayRef(ConcreteArrayType(el_type, access), label, asm.IntLiteral(length))
-
-    def get_checked_index(self, r_idx_out: asm.LabelRef, idx_arg: asm.AssemblyExpression,
-                          length_arg: asm.AssemblyExpression) -> asm.InstrGen[asm.AssemblyExpression]:
-        # idx_arg should match r_idx_out to avoid unnecessary copies
-        index_positive = self.add_label('index_positive')
-        index_in_bounds = self.add_label('index_in_bounds')
-
-        if isinstance(idx_arg, asm.IntLiteral):
-            # Fast track for IntLiteral (otherwise we'd need to copy it
-            # for halt propagation reasons, below)
-            if idx_arg.data < 0:
-                # We could do extra optimizations in the case length is
-                # also immediate, but it's not necessary.
-                yield asm.Add(r_idx_out, length_arg, idx_arg)
-                idx_arg = asm.State(r_idx_out)
-        else:
-            # Halt propagation will fail if idx_arg != State(r_idx_out)
-            # since idx_arg wouldn't get changed by the Add.
-            # So we must use idx_arg.to() to ensure it's in r_idx_out
-            yield from idx_arg.to(r_idx_out)
-            idx_arg = asm.State(r_idx_out)
-            yield asm.Jump(index_positive)
-            yield asm.Hge(idx_arg, asm.IntLiteral(0))
-            yield asm.Add(r_idx_out, length_arg, idx_arg)
-            yield asm.Label(index_positive)
-            yield asm.Hlt(idx_arg, asm.IntLiteral(0))
-
-        yield asm.Jump(index_in_bounds)
-        yield asm.Hlt(idx_arg, length_arg)
-        yield from self.goto(stdlib.index_out_of_bounds)
-        yield asm.Label(index_in_bounds)
-        return idx_arg
-
-    # def get_array_reference(self, expr, *, copy=False):
-    #     # Returns tuple: Bubble, array ref
-    #     yield from ()
-    #     return ...
 
     # if_true and if_false are iterables of instructions.
     # these may be duplicated, and so should be short.
@@ -913,13 +899,56 @@ class CodeGen:
         else:
             assert False
 
-    def lookup_idx_to_reg(self, r_out, src_expr, idx_expr):
+    @property
+    def max_signed(self):
+        return (1 << (8 * self.word_size - 1)) - 1
+
+    @property
+    def max_unsigned(self):
+        return (1 << (8 * self.word_size)) - 1
+
+    def max_length(self, el_type: DataType):
+        if el_type.byte_sized:
+            return self.max_signed
+        return self.max_signed // self.word_size
+
+    # Probably unnecessary because we ensure stack size isn't too big
+    # Just check for stack overflow instead.
+    # But be aware of overflow when checking stack overflow I guess.
+    # I guess maybe if el_type is not byte size, then it's safest to do
+    # two checks, one that length is sane, and the other one for stack
+    # overflow, but if it is byte sized then only check stack overflow.
+    # def check_length(self, el_type: DataType, length_arg: asm.AssemblyExpression):
+    #     safe_length = self.add_label('safe_length')
+    #     yield asm.Jump(safe_length)
+    #     if el_type.byte_sized:
+    #         yield asm.Hge(length_arg, asm.IntLiteral(0))
+    #     else:
+    #         yield asm.Hleu(length_arg, asm.IntLiteral(self.max_signed // self.word_size))
+    #     yield from self.goto(stdlib.out_of_bounds)
+    #     yield asm.Label(safe_length)
+
+    def check_index(self, idx_arg: asm.AssemblyExpression, length_arg: asm.AssemblyExpression):
+        index_in_bounds = self.add_label('index_in_bounds')
+
+        # The length should always be positive signed.
+        # We produce error if index is greater than or equal to length
+        # unsigned, ie it is greater than length signed or less than 0
+        yield asm.Jump(index_in_bounds)
+        yield asm.Hltu(idx_arg, length_arg)
+        yield from self.goto(stdlib.out_of_bounds)
+        yield asm.Label(index_in_bounds)
+
+    def array_lookup(self, r_out, src_expr, idx_expr):
+        # In the case of string, we need keep for the source bubble.
+        # Doesn't matter in the case of arrays, eval_expr shouldn't ever
+        # copy array references.
+        bubble = yield from self.eval_expr(self.r2, src_expr, keep=True)
+        index = yield from self.get_expr_value(self.r1, idx_expr)
         if src_expr.type == DataType.STRING:
-            bubble = yield from self.eval_expr(self.r2, src_expr, keep=True)
-            index = yield from self.get_expr_value(self.r1, idx_expr)
             source = yield from self.pop_value(self.r2, bubble)
             yield asm.Lwc(self.r0, source)
-            index = yield from self.get_checked_index(self.r1, index, asm.State(self.r0))
+            yield from self.check_index(index, asm.State(self.r0))
 
             # If either source_arg or idx_arg is immediate, this
             # add could be combined into the lbco if I wanted.
@@ -929,25 +958,18 @@ class CodeGen:
             yield asm.Lbco(r_out, source, asm.State(self.r1))
             return asm.State(r_out)
         elif isinstance(src_expr.type, ArrayType):
-            # Unlike for strings it is safe to leave an array reference
-            # in a bubble, we do not need to keep it.  However, the plan
-            # is to write eval_expr in a way so that it knows that and
-            # does not copy such references to the stack.
-
-            bubble = yield from self.eval_expr(self.r2, src_expr, keep=True)
-            index = yield from self.get_expr_value(self.r1, idx_expr)
             length = yield from bubble.value.length.get(self.r0)
-            index = yield from self.get_checked_index(self.r1, index, length)
+            yield from self.check_index(index, length)
             origin = yield from bubble.value.origin.get(self.r0)
 
             section = bubble.value.section
             if src_expr.type.el_type == DataType.BOOL:
-                yield asm.And(self.r2, origin, asm.IntLiteral(7))
-                yield asm.Asr(self.r1, origin, asm.IntLiteral(3))
+                yield asm.And(self.r2, index, asm.IntLiteral(7))
+                yield asm.Asr(self.r1, index, asm.IntLiteral(3))
                 yield section.lbo(self.r1, origin, asm.State(self.r1))
                 yield asm.Asr(self.r1, asm.State(self.r1), asm.State(self.r2))
                 yield asm.And(r_out, asm.State(self.r1), asm.IntLiteral(1))
-            elif src_expr.type.el_type == DataType.BYTE:
+            elif src_expr.type.el_type.byte_sized:
                 yield section.lbo(r_out, origin, index)
             else:
                 yield asm.Mul(self.r1, index, asm.IntLiteral(self.word_size))
@@ -958,20 +980,87 @@ class CodeGen:
         else:
             assert False
 
-    # def array_assignment(self, arr_expr, idx_expr, rhs_expr, bin_op=None):
-    #     assert isinstance(arr_expr.type, ArrayType)
-    #     bubble, ref = yield from self.get_array_reference(arr_expr)
-    #     idx_arg = yield from self.eval_word_expr_to_reg_or_imm(self.r1, idx_expr)
-    #     length_arg = ref.use_length(self.r0)
-    #     idx_arg = yield from self.checked_index_to_reg_or_imm(self.r1, idx_arg, length_arg)
-    #     if arr_expr.type.el_type == DataType.BOOL:
-    #         # No incremental assignments currently exist for BOOL
-    #         assert bin_op is None
-    #         ...
-    #     else:
-    #         yield from self.old_push_value(...)
-    #
-    #     yield from self.pop(bubble)
+    def array_assignment(self, src_expr, idx_expr, rhs_expr, bin_op=None):
+        assert isinstance(src_expr.type, ArrayType)
+        array_bubble = yield from self.eval_expr(self.r2, src_expr, keep=True)
+        section = array_bubble.value.section
+        if src_expr.type.el_type == DataType.BOOL:
+            # No incremental assignments currently exist for BOOL
+            # And I'll be damned to add any!
+            assert bin_op is None
+
+            # The plan:
+            #  b = i / 8
+            #  n = i % 8
+            #  a[b] = (a[b] & ~(1<<n)) | (rhs<<n)
+            # Note: Unlike incremental assignments, we need a[b] AFTER
+            # rhs has been evaluated, rather than before.
+
+            index = yield from self.get_expr_value(self.r1, idx_expr)
+            length = yield from array_bubble.value.length.get(self.r0)
+            yield from self.check_index(index, length)
+            yield asm.Asr(self.r2, index, asm.IntLiteral(3))
+            offset_bubble = self.reserve_word()
+            yield from offset_bubble.value.set(asm.State(self.r2))
+            yield asm.And(self.r1, index, asm.IntLiteral(7))
+            bit_bubble = self.reserve_byte()
+            yield from bit_bubble.value.set(asm.State(self.r1))
+
+            rhs = yield from self.get_expr_value(self.r2, rhs_expr)
+            origin = yield from array_bubble.value.origin.get(self.r0)
+            offset = yield from offset_bubble.value.get(self.r1)
+            yield section.lbo(self.r0, origin, offset)
+            # Alternatively here we could do the 1<<bit first and then
+            # multiply it by rhs.  This would allow us to keep 1<<bit on
+            # the stack rather than bit.  Might be useful if we do end
+            # up wanting to add incremental boolean operators like ^=
+            bit = yield from self.pop_value(self.r1, bit_bubble)
+            yield asm.Asl(self.r2, rhs, bit)
+            yield asm.Asl(self.r1, asm.IntLiteral(1), bit)
+            yield asm.Xor(self.r1, asm.State(self.r1), asm.IntLiteral(-1))
+            yield asm.And(self.r1, asm.State(self.r0), asm.State(self.r1))
+            yield asm.Or(self.r2, asm.State(self.r1), asm.State(self.r2))
+            origin = yield from array_bubble.value.origin.get(self.r0)
+            offset = yield from self.pop_value(self.r1, offset_bubble)
+            yield section.sbo(origin, offset, asm.State(self.r2))
+            yield from self.pop(array_bubble)
+            return  # We've done our own cleanup here
+        elif src_expr.type.el_type.byte_sized:
+            offset_bubble = yield from self.eval_expr(self.r1, idx_expr, keep=True)
+            offset = yield from offset_bubble.get_fast(self.r1)
+            length = yield from array_bubble.value.length.get(self.r0)
+            yield from self.check_index(offset, length)
+            lo_instr = section.lbo
+            so_instr = section.sbo
+        else:
+            index = yield from self.get_expr_value(self.r1, idx_expr)
+            length = yield from array_bubble.value.length.get(self.r0)
+            yield from self.check_index(index, length)
+            yield asm.Mul(self.r1, index, asm.IntLiteral(self.word_size))
+            offset = asm.State(self.r1)
+            offset_bubble = self.reserve_word()
+            yield from offset_bubble.value.set(offset)
+            lo_instr = section.lwo
+            so_instr = section.swo
+        # Here we have offset_bubble, offset:r1, lo_instr, so_instr
+
+        if bin_op is None:
+            rhs = yield from self.get_expr_value(self.r2, rhs_expr)
+        else:
+            origin = yield from array_bubble.value.origin.get(self.r0)
+            yield lo_instr(self.r0, origin, offset)
+            lhs_bubble = yield from self.push_value(src_expr.type.el_type, asm.State(self.r0))
+            increment = yield from self.get_expr_value(self.r2, rhs_expr)
+            lhs = yield from self.pop_value(self.r0, lhs_bubble)
+            yield from self.arith_op_reg_arg(bin_op, self.r2, lhs, increment)
+            rhs = asm.State(self.r2)
+        # Here we have rhs:r2
+
+        origin = yield from array_bubble.value.origin.get(self.r0)
+        offset = yield from self.pop_value(self.r1, offset_bubble)
+        yield so_instr(origin, offset, rhs)
+        yield from self.pop(array_bubble)
+
 
     def add_label(self, name):
         suffix = self.numbered_labels.get(name, 0)

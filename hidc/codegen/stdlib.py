@@ -7,7 +7,7 @@ from .symbols import ConcreteSignature, DataType, ConcreteArrayType, Ident, Acce
 # all_is_win and all_is_broken also happen to be exposed as functions
 all_is_win = asm.LabelRef('all_is_win')
 all_is_broken = asm.LabelRef('all_is_broken')
-index_out_of_bounds = asm.LabelRef('index_out_of_bounds')
+out_of_bounds = asm.LabelRef('out_of_bounds')
 stack_overflow = asm.LabelRef('stack_overflow')
 division_by_zero = asm.LabelRef('division_by_zero')
 
@@ -45,6 +45,11 @@ stdlib_funcs = {
 
 # TODO: test for stack overflow in print_int,
 #  May need up to 4 words of stack space: 1 for RA + 3 for buffer.
+#  Also probably restructure print loops to make most jumps look only
+#  lookahead locally.
+#  Goal: hello world should have > 50% emulator efficiency.
+#  (currently it's more efficient to write a loop in HiD to print
+#  characters than to call print!)
 
 stdlib_lines = list(filter(None, textwrap.dedent("""
     all_is_win:
@@ -56,16 +61,16 @@ stdlib_lines = list(filter(None, textwrap.dedent("""
         flag error
         j tnt
         halt
-    index_out_of_bounds:
-        flag index_out_of_bounds
-        j all_is_broken
-        halt
     stack_overflow:
         flag stack_overflow
         j all_is_broken
         halt
     division_by_zero:
         flag division_by_zero
+        j all_is_broken
+        halt
+    out_of_bounds:
+        flag out_of_bounds
         j all_is_broken
         halt
 
@@ -90,6 +95,7 @@ stdlib_lines = list(filter(None, textwrap.dedent("""
         halt
         print_string_done:
         hgt [r1], 0
+        print_return:
         lwso [r0], [fp], -1w
         j [r0]
         halt
@@ -133,26 +139,39 @@ stdlib_lines = list(filter(None, textwrap.dedent("""
 
 
     print_int:
+        add [r0], [fp], -1w
         lwso [r2], [fp], -2w
         j print_int_pos
         hge [r2], 0
         yield '-'
         sub [r2], 0, [r2]
+        j print_int_pos
+        hge [r2], 0
+        ; Deal with the special case of the minimum signed integer
+        sub [r2], [r2], 10
+        mod [r1], [r2], 10
+        div [r2], [r2], 10
+        add [r2], [r2], 1
+        j print_int_push
+        halt
         print_int_pos:
         hlt [r2], 0
 
-        add [r0], [fp], -1w
+        ; Special-casing 0 produces a nicer loop structure
+        j print_int_get_digits
+        hne [r2], 0
+        yield '0'
+        j print_return
+
         print_int_get_digits:
+        heq [r2], 0
             mod [r1], [r2], 10
             div [r2], [r2], 10
+            print_int_push:
             add [r1], [r1], '0'
             sub [r0], [r0], 1
             sbs [r0], [r1]
-        j print_int_have_digits
-        heq [r2], 0
         j print_int_get_digits
-        halt
-        print_int_have_digits:
         hne [r2], 0
 
         sub [r1], [fp], [r0]

@@ -67,6 +67,7 @@ builtin_funcs = {
     for stub in [
         BuiltinStub(DataType.VOID, Ident.defeat('is_defeat'), ()),
         BuiltinStub(DataType.VOID, Ident.defeat('truth_is_defeat'), (DataType.BOOL,)),
+        # TODO: I think I want to rename "print" to "write"
         BuiltinStub(DataType.VOID, Ident('print'), (DataType.STRING,)),
         BuiltinStub(DataType.VOID, Ident('print'), (ArrayType(DataType.BYTE, const=True),)),
         BuiltinStub(DataType.VOID, Ident('print'), (DataType.INT,)),
@@ -80,6 +81,7 @@ builtin_funcs = {
         BuiltinStub(DataType.VOID, Ident('println'), ()),
         BuiltinStub(DataType.VOID, Ident('all_is_win'), ()),
         BuiltinStub(DataType.VOID, Ident('all_is_broken'), ())
+        # TODO: also sleep and debug?  (level_is_debug?)
     ]
 }
 
