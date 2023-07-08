@@ -120,6 +120,12 @@ class LoopInfo:
     continue_label: asm.LabelRef
     break_label: asm.LabelRef
 
+@dc.dataclass
+class CatchInfo:
+    prev_ap: ValueBubble
+    contagious: ValueBubble
+    label: asm.LabelRef
+
 
 arith_map = {
     ast.Add: asm.Add, ast.Sub: asm.Sub, ast.Mul: asm.Mul,
@@ -163,6 +169,7 @@ class CodeGen:
     func_labels: dict[ConcreteSignature, asm.LabelRef]         = dc.field(init=False, default_factory=dict)
     func_table: dict[ConcreteSignature, list[asm.Instruction]] = dc.field(init=False, default_factory=dict)
     loop_info: deque[LoopInfo]                                 = dc.field(init=False, default_factory=deque)
+    catch_info: CatchInfo                                      = dc.field(init=False, default=None)
 
     # TODO: I want to keep track of maximum static size (offset + static
     #  array size) seen for various checkpoints.
@@ -326,9 +333,29 @@ class CodeGen:
                 yield asm.Label(loop_break)
             case ast.TryBlock():
                 handler = self.add_label('try_handler')
+                begin_try = self.add_label('begin_try')
                 end_try = self.add_label('end_try')
                 yield asm.Metadata('try block')
-                yield asm.Jump(handler)
+                if isinstance(block.handler, ast.CatchBlock):
+                    # For catch, the simplest way I can think to manage
+                    # the array pointer is simply to push old ap on the
+                    # stack prior to try and restore in catch.
+                    prev_ap = self.reserve_word()
+                    yield from prev_ap.value.set(asm.State(self.ap))
+                    contagious = self.reserve_byte()
+                    assert self.catch_info is None
+                    self.catch_info = CatchInfo(prev_ap, contagious, handler)
+                    # If running the try "normally" would be defeat, we
+                    # instead run in "contagious" mode, which makes it
+                    # so that preempts are always taken and defeat jumps
+                    # to the catch block.
+                    yield from contagious.value.set(asm.IntLiteral(1))
+                    yield asm.Jump(begin_try)
+                    yield from contagious.value.set(asm.IntLiteral(0))
+                    yield asm.Label(begin_try)
+                else:
+                    assert isinstance(block.handler, ast.UndoBlock)
+                    yield asm.Jump(handler)
                 yield from self.gen_block(block.body)
                 yield from self.goto(end_try)
                 yield asm.Label(handler)
@@ -337,11 +364,23 @@ class CodeGen:
             case ast.UndoBlock():
                 yield asm.Metadata('undo block')
                 yield from self.gen_block(block.body)
+            case ast.CatchBlock():
+                yield asm.Metadata('catch block')
+
+                # Do not allow catch block to run unless contagious
+                is_contagious = yield from self.pop_value(self.r1, self.catch_info.contagious)
+                yield asm.Heq(is_contagious, asm.IntLiteral(0))
+                yield from self.catch_info.prev_ap.value.to(self.ap)
+                yield from self.pop(self.catch_info.prev_ap)
+                self.catch_info = None
+                yield from self.gen_block(block.body)
             case ast.PreemptBlock():
                 do_preempt = self.add_label('do_preempt')
                 end_preempt = self.add_label('end_preempt')
                 yield asm.Metadata('preempt block')
                 yield asm.Jump(do_preempt)
+                is_contagious = yield from self.catch_info.contagious.value.get(self.r1)
+                yield asm.Hne(is_contagious, asm.IntLiteral(0))
                 yield from self.goto(end_preempt)
                 yield asm.Label(do_preempt)
                 yield from self.gen_block(block.body)
@@ -668,6 +707,11 @@ class CodeGen:
 
     def eval_func_call(self, ret_type: ast.DataType, name: ast.Ident,
                        args: tuple[ast.Expression, ...])->asm.InstrGen[ValueBubble]:
+
+        # Provide an opportunity to jump to catch block for every defeat
+        # function call.
+        if self.catch_info is not None and name.flavor == ast.Flavor.DEFEAT:
+            yield asm.Jump(self.catch_info.label)
 
         if name == ast.Ident('print') and len(args) == 1:
             if args[0].type == DataType.BYTE:

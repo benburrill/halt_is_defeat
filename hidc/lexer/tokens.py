@@ -147,6 +147,7 @@ class BlockToken(EnumToken):
     FOR = 'for'
     TRY = 'try'
     UNDO = 'undo'
+    CATCH = 'catch'
     PREEMPT = 'preempt'
 
 

@@ -2,8 +2,8 @@
 Halt is Defeat
 ==============
 
-Halt is Defeat is a prophecy-optimized oracle-oriented programming
-language targeting the Sphinx ISA.
+Halt is Defeat is a prophecy-optimized language targeting the Sphinx
+ISA.
 
 Key features of Halt is Defeat:
  * Function overloading
@@ -80,3 +80,56 @@ may destroy the universe.
 
 A taste of defeat
 -----------------
+
+.. code::
+
+    void @is_you() {
+        try {
+            println("try block");
+            !is_defeat();
+        } catch {
+            println("catch block");
+        }
+    }
+
+
+Time travel
+-----------
+Sure, it's nice to know when you've made a mistake.  But more often than
+not, we really just wish we could go back and undo it.  Halt is Defeat
+provides an undo block for this purpose.
+
+.. code::
+
+    void @is_you() {
+        try {
+            println("try block");
+            !is_defeat();
+        } undo {
+            println("undo block");
+        }
+    }
+
+
+Halting problems
+----------------
+
+.. code::
+
+    void @is_you() {
+        try {
+            println("The loop runs forever");
+            while (true) {}
+            !is_defeat();
+        } undo {
+            println("The loop terminates");
+        }
+    }
+
+Now of course, this has the unavoidable side-effect of actually running
+the loop if it is determined to run forever, but at least we can inform
+the user in advance.
+
+
+Computational astrology
+-----------------------

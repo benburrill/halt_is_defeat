@@ -262,9 +262,10 @@ async def ps_block(ctx):
         if BlockContext.YOU not in ctx:
             raise ParserError('try outside of you', start)
         body = await expect(ps_block((ctx & ~BlockContext.YOU) | BlockContext.TRY))
-        undo_tok = await expect(Exact(BlockToken.UNDO))
-        undo = UndoBlock(undo_tok.span.start, await expect(ps_block(ctx)))
-        return TryBlock(start, body, undo)
+        handler_blocks = {BlockToken.UNDO: UndoBlock, BlockToken.CATCH: CatchBlock}
+        lxm = await expect(OneOf(handler_blocks))
+        handler = handler_blocks[lxm.token](lxm.span.start, await expect(ps_block(ctx)))
+        return TryBlock(start, body, handler)
     elif await Exact(BlockToken.PREEMPT):
         if BlockContext.TRY not in ctx:
             raise ParserError('preempt outside of try', start)
