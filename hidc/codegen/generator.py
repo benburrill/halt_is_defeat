@@ -353,7 +353,7 @@ class CodeGen:
                     # prev_defeat should always be stdlib.defeat, but
                     # doing this gives the illusion of flexibility.
                     prev_defeat = self.effective_defeat
-                    self.effective_defeat = handler
+                    self.effective_defeat = asm.State(self.defeat)
                     self.needs_variable_defeat = True
 
                     # We must keep ap to restore later, since defeat
