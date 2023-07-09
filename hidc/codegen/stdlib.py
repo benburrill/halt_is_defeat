@@ -10,6 +10,7 @@ all_is_broken = asm.LabelRef('all_is_broken')
 out_of_bounds = asm.LabelRef('out_of_bounds')
 stack_overflow = asm.LabelRef('stack_overflow')
 division_by_zero = asm.LabelRef('division_by_zero')
+halt = asm.LabelRef('halt')
 
 # NOTE:
 # !is_defeat(), !truth_is_defeat(bool), print(byte), and println(...)
@@ -56,7 +57,7 @@ stdlib_lines = list(filter(None, textwrap.dedent("""
         flag win
         tnt: sleep 0x7f7f
         j tnt
-        halt
+        halt: halt
     all_is_broken:
         flag error
         j tnt

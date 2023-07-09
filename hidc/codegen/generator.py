@@ -119,12 +119,7 @@ class LoopInfo:
     restore_point: StackPoint
     continue_label: asm.LabelRef
     break_label: asm.LabelRef
-
-@dc.dataclass
-class CatchInfo:
-    prev_ap: ValueBubble
-    contagious: ValueBubble
-    label: asm.LabelRef
+    loop_defeat: asm.AssemblyExpression
 
 
 arith_map = {
@@ -169,7 +164,10 @@ class CodeGen:
     func_labels: dict[ConcreteSignature, asm.LabelRef]         = dc.field(init=False, default_factory=dict)
     func_table: dict[ConcreteSignature, list[asm.Instruction]] = dc.field(init=False, default_factory=dict)
     loop_info: deque[LoopInfo]                                 = dc.field(init=False, default_factory=deque)
-    catch_info: CatchInfo                                      = dc.field(init=False, default=None)
+
+    effective_defeat: asm.AssemblyExpression                   = dc.field(init=False, default=stdlib.halt)
+    func_defeat: asm.AssemblyExpression                        = dc.field(init=False, default=stdlib.halt)
+    needs_variable_defeat: bool                                = dc.field(init=False, default=False)
 
     # TODO: I want to keep track of maximum static size (offset + static
     #  array size) seen for various checkpoints.
@@ -182,6 +180,8 @@ class CodeGen:
     r0 = asm.LabelRef('r0')
     r1 = asm.LabelRef('r1')
     r2 = asm.LabelRef('r2')
+    cfp = asm.LabelRef('cfp')
+    defeat = asm.LabelRef('defeat')
 
     def __post_init__(self):
         if self.word_size < 2:
@@ -225,6 +225,10 @@ class CodeGen:
             yield from asm.Label(label).lines()
             yield from directive.lines()
 
+        if self.needs_variable_defeat:
+            yield b'cfp: .word 0'
+            yield b'defeat: .word halt'
+
         yield b'%section const'
         for string, label in self.string_labels.items():
             yield from asm.Label(label).lines()
@@ -257,6 +261,15 @@ class CodeGen:
     def gen_func(self, csig: ConcreteSignature, func: ast.FuncDeclaration):
         assert self.stack == StackPoint(0)
         self.local_vars = ChainMap()
+
+        # In defeat functions, we must assume we're being called from
+        # a try/catch block, so use variable defeat.
+        if csig.name.flavor == ast.Flavor.DEFEAT:
+            self.func_defeat = asm.State(self.defeat)
+            self.needs_variable_defeat = True
+        else:
+            self.func_defeat = stdlib.halt
+        self.effective_defeat = self.func_defeat
 
         # Reserve space for RA and passed arguments
         bubble = self.reserve_word()
@@ -324,7 +337,7 @@ class CodeGen:
                 yield asm.Metadata('loop block')
                 yield asm.Label(loop_start)
                 yield from self.bool_expr_branch(block.cond, (), self.goto(loop_break))
-                self.loop_info.append(LoopInfo(self.stack, loop_continue, loop_break))
+                self.loop_info.append(LoopInfo(self.stack, loop_continue, loop_break, self.effective_defeat))
                 yield from self.gen_block(block.body)
                 self.loop_info.pop()
                 yield asm.Label(loop_continue)
@@ -337,50 +350,61 @@ class CodeGen:
                 end_try = self.add_label('end_try')
                 yield asm.Metadata('try block')
                 if isinstance(block.handler, ast.CatchBlock):
-                    # For catch, the simplest way I can think to manage
-                    # the array pointer is simply to push old ap on the
-                    # stack prior to try and restore in catch.
-                    prev_ap = self.reserve_word()
-                    yield from prev_ap.value.set(asm.State(self.ap))
-                    contagious = self.reserve_byte()
-                    assert self.catch_info is None
-                    self.catch_info = CatchInfo(prev_ap, contagious, handler)
-                    # If running the try "normally" would be defeat, we
-                    # instead run in "contagious" mode, which makes it
-                    # so that preempts are always taken and defeat jumps
-                    # to the catch block.
-                    yield from contagious.value.set(asm.IntLiteral(1))
+                    # prev_defeat should always be stdlib.defeat, but
+                    # doing this gives the illusion of flexibility.
+                    prev_defeat = self.effective_defeat
+                    self.effective_defeat = handler
+                    self.needs_variable_defeat = True
+
+                    # We must keep ap to restore later, since defeat
+                    # could come from anywhere.
+                    ap_bubble = self.reserve_word()
+                    yield from ap_bubble.value.set(asm.State(self.ap))
+                    # Since defeat could come from within a defeat
+                    # function, not even fp is safe.  We need to store
+                    # it, and obviously we can't keep it on the stack --
+                    # it needs its own special-purpose global variable.
+                    # Thankfully try cannot be nested.
+                    yield asm.Mov(self.cfp, asm.State(self.fp))
+
+                    yield asm.Mov(self.defeat, handler)
                     yield asm.Jump(begin_try)
-                    yield from contagious.value.set(asm.IntLiteral(0))
+                    yield asm.Mov(self.defeat, stdlib.halt)
                     yield asm.Label(begin_try)
+                    yield from self.gen_block(block.body)
+                    yield from self.goto(end_try)
+
+                    yield asm.Label(handler)
+                    yield asm.Metadata('catch block')
+                    self.effective_defeat = prev_defeat
+                    yield asm.Mov(self.fp, asm.State(self.cfp))
+                    yield from ap_bubble.value.to(self.ap)
+                    yield from self.pop(ap_bubble)
+
+                    yield from self.gen_block(block.handler.body)
                 else:
+                    # By contrast to catch, undo is nice and simple.
+                    # If there would be defeat, the try block won't be
+                    # run at all, so there's no mess we need to clean up
                     assert isinstance(block.handler, ast.UndoBlock)
                     yield asm.Jump(handler)
-                yield from self.gen_block(block.body)
-                yield from self.goto(end_try)
-                yield asm.Label(handler)
-                yield from self.gen_block(block.handler)
-                yield asm.Label(end_try)
-            case ast.UndoBlock():
-                yield asm.Metadata('undo block')
-                yield from self.gen_block(block.body)
-            case ast.CatchBlock():
-                yield asm.Metadata('catch block')
+                    yield from self.gen_block(block.body)
+                    yield from self.goto(end_try)
 
-                # Do not allow catch block to run unless contagious
-                is_contagious = yield from self.pop_value(self.r1, self.catch_info.contagious)
-                yield asm.Heq(is_contagious, asm.IntLiteral(0))
-                yield from self.catch_info.prev_ap.value.to(self.ap)
-                yield from self.pop(self.catch_info.prev_ap)
-                self.catch_info = None
-                yield from self.gen_block(block.body)
+                    yield asm.Label(handler)
+                    yield asm.Metadata('undo block')
+                    yield from self.gen_block(block.handler.body)
+                yield asm.Label(end_try)
             case ast.PreemptBlock():
                 do_preempt = self.add_label('do_preempt')
                 end_preempt = self.add_label('end_preempt')
                 yield asm.Metadata('preempt block')
                 yield asm.Jump(do_preempt)
-                is_contagious = yield from self.catch_info.contagious.value.get(self.r1)
-                yield asm.Hne(is_contagious, asm.IntLiteral(0))
+                if self.effective_defeat != stdlib.halt:
+                    # If the effective defeat is not halt, it means that
+                    # defeat is virtualized, which only happens when
+                    # defeat was inevitable, so preempt should be run.
+                    yield asm.Hne(self.effective_defeat, stdlib.halt)
                 yield from self.goto(end_preempt)
                 yield asm.Label(do_preempt)
                 yield from self.gen_block(block.body)
@@ -428,6 +452,9 @@ class CodeGen:
                             yield from bubble.value.set(retval)
                     else:
                         ra = yield from self.return_address.get(self.r1)
+                    # Restore defeat handler if necessary
+                    if self.effective_defeat != self.func_defeat:
+                        yield asm.Mov(self.defeat, self.func_defeat)
                     # Deallocate all arrays currently in scope
                     yield from self.reset_ap(0)
                     # Jump to return address
@@ -435,11 +462,15 @@ class CodeGen:
                     return True, var_bubble
                 case ast.BreakStatement():
                     info = self.loop_info[-1]
+                    if self.effective_defeat != info.loop_defeat:
+                        yield asm.Mov(self.defeat, info.loop_defeat)
                     yield from self.reset_ap(info.restore_point.array_num)
                     yield from self.goto(info.break_label)
                     return True, var_bubble
                 case ast.ContinueStatement():
                     info = self.loop_info[-1]
+                    if self.effective_defeat != info.loop_defeat:
+                        yield asm.Mov(self.defeat, info.loop_defeat)
                     yield from self.reset_ap(info.restore_point.array_num)
                     yield from self.goto(info.continue_label)
                     return True, var_bubble
@@ -708,11 +739,6 @@ class CodeGen:
     def eval_func_call(self, ret_type: ast.DataType, name: ast.Ident,
                        args: tuple[ast.Expression, ...])->asm.InstrGen[ValueBubble]:
 
-        # Provide an opportunity to jump to catch block for every defeat
-        # function call.
-        if self.catch_info is not None and name.flavor == ast.Flavor.DEFEAT:
-            yield asm.Jump(self.catch_info.label)
-
         if name == ast.Ident('print') and len(args) == 1:
             if args[0].type == DataType.BYTE:
                 arg = yield from self.get_expr_value(self.r1, args[0])
@@ -728,6 +754,8 @@ class CodeGen:
             yield asm.Yield(asm.IntLiteral(ord('\n'), is_byte=True))
             return self.reserve_type(DataType.VOID)
         elif name == ast.Ident.defeat('is_defeat') and len(args) == 0:
+            if self.effective_defeat != stdlib.halt:
+                yield asm.Jump(self.effective_defeat)
             yield asm.Halt()
             return self.reserve_type(DataType.VOID)
         elif name == ast.Ident.defeat('truth_is_defeat') and len(args) == 1:
@@ -962,18 +990,25 @@ class CodeGen:
             left_bubble = yield from self.eval_expr(self.r0, expr.left, keep=True)
             right = yield from self.get_expr_value(self.r1, expr.right)
             left = yield from self.pop_value(self.r0, left_bubble)
+            if self.effective_defeat != stdlib.halt:
+                yield asm.Jump(self.effective_defeat)
             yield instr(left, right)
         elif type(expr) is ast.Or:
             yield from self.truth_is_defeat(expr.left)
             yield from self.truth_is_defeat(expr.right)
         elif type(expr) is ast.BoolValue:
-            if expr.data: yield asm.Halt()
+            if expr.data:
+                if self.effective_defeat != stdlib.halt:
+                    yield asm.Jump(self.effective_defeat)
+                yield asm.Halt()
         elif expr.type == DataType.BOOL:
             if type(expr) is ast.IntToBool:
                 expr = expr.expr
             # I think get_expr_value is better than bool_expr_branch
             # here in most cases, but I don't know.
             value = yield from self.get_expr_value(self.r1, expr)
+            if self.effective_defeat != stdlib.halt:
+                yield asm.Jump(self.effective_defeat)
             yield asm.Hne(value, asm.IntLiteral(0))
         else:
             assert False
