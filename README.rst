@@ -81,6 +81,16 @@ may destroy the universe.
 A taste of defeat
 -----------------
 
+Defeat functions have names starting with ``!``, and may result in
+defeat if called.  ``!is_defeat()`` always causes defeat.  Defeat
+functions cannot be called directly from within you functions, but you
+can create a try block within you to safely run code which may lead to
+defeat.
+
+In this example we use the catch handler, which treats defeat similarly
+to exceptions in other languages.  The catch block is run when defeat is
+reached:
+
 .. code::
 
     void @is_you() {
@@ -92,12 +102,35 @@ A taste of defeat
         }
     }
 
+Output:
+
+.. code::
+
+    $ hidc catch.hid -o catch.s
+    $ spasm catch.s
+    try block
+    catch block
+    Reached win flag
+        CPU time: 177 clock cycles
+        Emulator efficiency: 46.21%
+
+
+Note that defeat's utility as a replacement for exceptions is limited.
+There is only one form of defeat, and try blocks can ONLY be used within
+a "you" context.  Since try blocks create a defeat context within the
+block, so you cannot nest try blocks as in other languages.
+
+Defeat is not the same thing as an exception, however.  The purpose of
+defeat is not to represent an exceptional condition that needs to be
+handled -- the purpose of defeat is to be avoided!
 
 Time travel
 -----------
 Sure, it's nice to know when you've made a mistake.  But more often than
-not, we really just wish we could go back and undo it.  Halt is Defeat
-provides an undo block for this purpose.
+not, we really just wish we could go back and undo it.  In HiD, you can!
+
+The ``undo`` block works similarly to ``catch``, but it goes back in
+time and prevents the try block from running if it would end in defeat:
 
 .. code::
 
@@ -110,12 +143,23 @@ provides an undo block for this purpose.
         }
     }
 
+Output:
+
+.. code::
+
+    $ hidc undo.hid -o undo.s
+    $ spasm undo.s
+    undo block
+    Reached win flag
+        CPU time: 87 clock cycles
+        Emulator efficiency: 30.85%
+
 
 Halting problems
 ----------------
-The undo block allows us to do some rather interesting things.  If we
-modify the above code by putting a loop before the ``!is_defeat()``, the
-code will test if the loop will terminate, since defeat would never
+The ``undo`` block allows us to do some rather interesting things.  If
+we modify the above code by putting a loop before the ``!is_defeat()``,
+the code will test if the loop will terminate, since defeat would never
 occur if the loop runs forever:
 
 .. code::
