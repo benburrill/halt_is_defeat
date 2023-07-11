@@ -190,8 +190,8 @@ undecidable, and HiD seems Turing-complete-ish, so what gives?*
 For more information on what's really going on here, see
 https://github.com/benburrill/sphinx, but to provide some small comfort
 that this isn't flagrantly impossible, Sphinx is not Turing complete.
-It is "Turing-complete-ish" (just like your computer is), but that only
-means its halting problem is generally intractable, not undecidable.
+It is "Turing-complete-ish" (similar to how your computer is), but that
+only means its halting problem is generally intractable, not undecidable.
 
 Sphinx's entire execution is based around this.  The instruction set
 provides only a single jump instruction, the "Turing jump instruction",
@@ -246,3 +246,22 @@ Caveats:
         }
     }
 
+Increasing the word size and stack size
+---------------------------------------
+
+By default, ``hidc`` targets a 16-bit word size, and provides only a
+meager 100 words of stack space.  These can both be increased.
+
+- To change the word size, use ``-m``, eg ``-m24`` to target 24 bits.
+- To change the stack size, use ``-s``, eg ``-s1000`` for 1000 words.
+
+As an alternative to increasing the stack size, you may also consider
+making your variables/arrays global, and where possible making them
+const.
+
+Although increasing the word and stack size can increase the size of the
+problems you can solve with HiD, be wary of the exponential tendencies
+of emulation under ``spasm`` -- you may want to take things slow.
+There's no prize for writing a program that requires more RAM in order
+to emulate than could fit in the observable universe, it just means you
+need a better computer.
