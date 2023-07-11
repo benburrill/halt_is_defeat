@@ -368,6 +368,39 @@ def test_loop():
         }
     """)
 
+    assert_good("""
+        int f() {
+            while (true) {
+                return 1;
+            }
+        }
+    """)
+
+    assert_bad("""
+        int f(int x) {
+            while (true) {
+                if (x < 10) {
+                    break;
+                }
+                
+                return 1;
+            }
+        }
+    """)
+
+    assert_good("""
+        int f(int x) {
+            while (true) {
+                if (x < 10) {
+                    break;
+                }
+                
+                return 1;
+            }
+            return 0;
+        }
+    """)
+
 def test_try():
     assert_good("""
         int @f() {
