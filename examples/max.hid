@@ -2,8 +2,8 @@
 // finds the max value, so it is much faster if the max value is at the
 // beginning of the array.
 
-// int[] input = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-int[] input = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+// const int[] default = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+const int[] default = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
 
 int @max(const int[] arr) {
     try {
@@ -39,10 +39,15 @@ void print_array(const int[] arr) {
     print(']');
 }
 
-void @is_you() {
-    print("Array: ");
-    print_array(input);
-    println();
-    print("Max value: ");
-    println(@max(input));
+void @is_you(int[] nums) {
+    if (nums) {
+        print("Max value: ");
+        println(@max(nums));
+    } else {
+        print("Array: ");
+        print_array(default);
+        println();
+        print("Max value: ");
+        println(@max(default));
+    }
 }

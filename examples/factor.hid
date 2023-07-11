@@ -54,14 +54,25 @@ bool @print_factors(int n) {
 }
 
 
-void @is_you() {
-    for (int i = 2; i < 20; i += 1) {
-        print("Factorization of ");
-        print(i);
-        print(": ");
-        if (@print_factors(i)) {
-            print(" -- it's prime!");
+void @show_factors(int n) {
+    print("Factorization of ");
+    print(n);
+    print(": ");
+    if (@print_factors(n)) {
+        print(" -- it's prime!");
+    }
+    println();
+}
+
+
+void @is_you(int[] nums) {
+    if (nums) {
+        for (int i = 0; i < nums.length; i += 1) {
+            @show_factors(nums[i]);
         }
-        println();
+    } else {
+        for (int i = 2; i < 20; i += 1) {
+            @show_factors(i);
+        }
     }
 }
