@@ -509,7 +509,8 @@ class CodeGen:
                         if isinstance(stmt, ast.IncAssignment):
                             stmt = stmt.type_equiv_assignment()
                         is_global, access = self.lookup_var(stmt.lookup.var)
-                        value = yield from self.get_expr_value(self.r1, stmt.expr)
+                        dest = access.immed if isinstance(access, asm.State) else self.r1
+                        value = yield from self.get_expr_value(dest, stmt.expr)
                         yield from access.set(value)
                     else:
                         bin_op = None
