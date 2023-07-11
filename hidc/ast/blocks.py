@@ -124,9 +124,9 @@ class LoopBlock(ControlBlock):
         mode = self.body.exit_modes()
 
         # Check for trivial infinite loop
-        if mode.replace(ExitMode.LOOP, ExitMode.NONE) == ExitMode.NONE:
+        if ExitMode.BREAK not in mode:
             if isinstance(self.cond, BoolValue) and self.cond.data:
-                return ExitMode.LOOP
+                return mode.replace(ExitMode.NONE, ExitMode.LOOP)
 
         # This will always include NONE, which is what we want since
         # even if there's a return, the loop might not get run at all.
