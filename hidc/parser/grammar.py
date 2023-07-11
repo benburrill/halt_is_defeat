@@ -119,13 +119,16 @@ async def ps_expr0(ctx):
 @Parser.routine('expression')
 async def ps_expr1(ctx):
     if not (expr := await ps_expr0(ctx)): return
-    if await Exact(SepToken.DOT):
-        attr = await expect(Exact(Ident('length')))
-        return LengthLookup(expr, attr.span.end)
-    if await Exact(BracToken.LSQUARE):
-        index = await expect(ps_expr(ctx))
-        end = await expect(Exact(BracToken.RSQUARE))
-        return ArrayLookup(expr, index, end.span.end)
+    while True:
+        if await Exact(SepToken.DOT):
+            attr = await expect(Exact(Ident('length')))
+            expr = LengthLookup(expr, attr.span.end)
+        elif await Exact(BracToken.LSQUARE):
+            index = await expect(ps_expr(ctx))
+            end = await expect(Exact(BracToken.RSQUARE))
+            expr = ArrayLookup(expr, index, end.span.end)
+        else:
+            break
     return expr
 
 @Parser.routine('expression')

@@ -124,6 +124,32 @@ def test_func_flavor():
     with raises(ParserError): parse_string('@f(x)', ps_expr(dctx))
 
 
+def test_misc_expr():
+    assert parse_string('arr[0].length', ps_expr(ctx)) == LengthLookup(
+        ArrayLookup(
+            VariableLookup(UnresolvedName('arr'), _),
+            IntValue(0, _), _
+        ), _
+    )
+
+    # Multidimensional arrays will probably never be supported, but
+    # should parse regardless.
+    assert parse_string('arr[0][1][2]', ps_expr(ctx)) == ArrayLookup(
+        ArrayLookup(
+            ArrayLookup(
+                VariableLookup(UnresolvedName('arr'), _),
+                IntValue(0, _), _
+            ), IntValue(1, _), _
+        ), IntValue(2, _), _
+    )
+
+    assert parse_string('[2][1][0]', ps_expr(ctx)) == ArrayLookup(
+        ArrayLookup(
+            ArrayLiteral((IntValue(2, _),), _),
+            IntValue(1, _), _
+        ), IntValue(0, _), _
+    )
+
 def test_try():
     assert parse_string("""
         try { preempt {} } undo {}
