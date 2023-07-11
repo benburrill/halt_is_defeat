@@ -676,8 +676,7 @@ class CodeGen:
                 yield from bubble.value.origin.set(asm.State(self.r1))
                 return bubble
             case ast.BinaryArithmeticOp():
-                # If expr.right is simple enough, we could do keep=False
-                left_bubble = yield from self.eval_expr(self.r0, expr.left, keep=True)
+                left_bubble = yield from self.eval_expr(self.r0, expr.left, keep=not self.is_safe(expr.right))
                 right = yield from self.get_expr_value(self.r1, expr.right)
                 left = yield from self.pop_value(self.r0, left_bubble)
                 yield from self.arith_op_reg_arg(type(expr), r_out, left, right)
@@ -986,7 +985,7 @@ class CodeGen:
             #  use bool_expr_jump in that case?
             compare_is_true = self.add_label('compare_is_true')
             compare_end = self.add_label('compare_end')
-            left_bubble = yield from self.eval_expr(self.r0, expr.left, keep=True)
+            left_bubble = yield from self.eval_expr(self.r0, expr.left, keep=not self.is_safe(expr.right))
             right = yield from self.get_expr_value(self.r1, expr.right)
             left = yield from self.pop_value(self.r0, left_bubble)
             yield asm.Jump(compare_is_true)
@@ -1065,7 +1064,7 @@ class CodeGen:
         #  not is expensive.
 
         if instr := compare_map.get(type(expr)):
-            left_bubble = yield from self.eval_expr(self.r0, expr.left, keep=True)
+            left_bubble = yield from self.eval_expr(self.r0, expr.left, keep=not self.is_safe(expr.right))
             right = yield from self.get_expr_value(self.r1, expr.right)
             left = yield from self.pop_value(self.r0, left_bubble)
             if self.effective_defeat != stdlib.halt:
@@ -1116,6 +1115,11 @@ class CodeGen:
         else:
             assert False
 
+    def is_safe(self, expr):
+        # In order to be considered safe, the expression must always be
+        # able to be evaluated without any side effects.
+        return isinstance(expr, ast.PrimitiveValue) or isinstance(expr, ast.VariableLookup)
+
     @property
     def max_signed(self):
         return (1 << (8 * self.word_size - 1)) - 1
@@ -1160,7 +1164,7 @@ class CodeGen:
         # In the case of string, we need keep for the source bubble.
         # Doesn't matter in the case of arrays, eval_expr shouldn't ever
         # copy array references.
-        bubble = yield from self.eval_expr(self.r2, src_expr, keep=True)
+        bubble = yield from self.eval_expr(self.r2, src_expr, keep=not self.is_safe(idx_expr))
         index = yield from self.get_expr_value(self.r1, idx_expr)
         if src_expr.type == DataType.STRING:
             source = yield from self.pop_value(self.r2, bubble)
