@@ -169,6 +169,9 @@ class CodeGen:
     func_defeat: asm.AssemblyExpression                        = dc.field(init=False, default=stdlib.halt)
     needs_variable_defeat: bool                                = dc.field(init=False, default=False)
 
+    argv_specs: list[bytes]                                    = dc.field(init=False, default_factory=list)
+    entry_args: list[asm.Directive]                            = dc.field(init=False, default_factory=list)
+
     # TODO: I want to keep track of maximum static size (offset + static
     #  array size) seen for various checkpoints.
     #  Current thought is to have special mutable AssemblyExpression and
@@ -190,11 +193,81 @@ class CodeGen:
         if ((self.stack_size + 5) * self.word_size) > self.max_signed:
             raise CodeGenError('Stack size too large', ())
 
-        if not self.func_decls.get(ast.Ident.you('is_you'), {}).get(()):
-            raise CodeGenError('Level is empty, expected entry point @is_you()', ())
+        is_you = self.func_decls.get(ast.Ident.you('is_you'), {})
+
+        if not is_you:
+            raise CodeGenError('Level is empty, expected entry point @is_you(...)', ())
+        elif len(is_you) != 1:
+            raise CodeGenError('Multiple entry points, text on text is weak', tuple(
+                decl.span for decl in is_you.values()
+            ))
+
+        is_you_decl, = is_you.values()
+        has_array = False
+        self.argv_specs = []
+        self.entry_args = []
+        concrete_types = []
+        for param in is_you_decl.params:
+            if isinstance(param.var.type, ArrayType):
+                if param.var.type.el_type == DataType.BYTE:
+                    arg_params = 'byte', ()
+                elif param.var.type.el_type == DataType.INT:
+                    arg_params = 'word', ()
+                elif param.var.type.el_type == DataType.STRING:
+                    if not param.var.type.const:
+                        raise CodeGenError(
+                            f'string[] in entry point parameter must be const',
+                            param.span
+                        )
+                    arg_params = 'asciip', ('array',)
+                else:
+                    raise CodeGenError(
+                        f'{param.var.type} not allowed as entry point parameter',
+                        param.span
+                    )
+
+                if has_array:
+                    raise CodeGenError(
+                        'No more than one array allowed in entry point parameters',
+                        param.span
+                    )
+                has_array = True
+
+                label = self.add_label('arg_' + param.var.name)
+                directive = asm.ArgDirective(param.var.name, *arg_params)
+                if param.var.type.const:
+                    self.const_data[label] = directive
+                    access = AccessMode.RC
+                else:
+                    self.state_data[label] = directive
+                    access = AccessMode.RW
+                concrete_types.append(ConcreteArrayType(param.var.type.el_type, access))
+                non_array_args = len(is_you_decl.params) - 1
+                array_length = asm.SpecialArg(f'$argc - {non_array_args}'.encode('utf-8'))
+                self.entry_args.append(asm.WordDirective(array_length))
+                self.entry_args.append(asm.WordDirective(label))
+                self.argv_specs.append(f'[<{param.var.name}>...]'.encode('utf-8'))
+            else:
+                assert isinstance(param.var.type, DataType)
+                if param.var.type == DataType.BYTE:
+                    self.entry_args.append(asm.ArgDirective(param.var.name, 'byte'))
+                elif param.var.type == DataType.INT:
+                    self.entry_args.append(asm.ArgDirective(param.var.name, 'word'))
+                elif param.var.type == DataType.STRING:
+                    label = self.add_label('arg_' + param.var.name)
+                    self.const_data[label] = asm.ArgDirective(param.var.name, 'asciip')
+                    self.entry_args.append(asm.WordDirective(label))
+                else:
+                    raise CodeGenError(
+                        f'{param.var.type} not allowed as entry point parameter',
+                        param.span
+                    )
+
+                self.argv_specs.append(f'<{param.var.name}>'.encode('utf-8'))
+                concrete_types.append(param.var.type)
 
         self.func_labels.update(stdlib.stdlib_funcs)
-        self.label_for_func(ConcreteSignature(ast.Ident.you('is_you'), ()))
+        self.label_for_func(ConcreteSignature(ast.Ident.you('is_you'), tuple(concrete_types)))
 
     @classmethod
     def from_program(cls, program: ast.Program, word_size, stack_size):
@@ -209,6 +282,8 @@ class CodeGen:
 
     def generate(self):
         self.make_funcs()
+        if self.argv_specs:
+            yield b'%argv ' + b' '.join(self.argv_specs)
         yield b'%format word ' + str(self.word_size).encode('utf-8')
         yield b'%format output byte'
         yield b'%section state'
@@ -219,6 +294,8 @@ class CodeGen:
         yield b'r2: .word 0'
         yield b'stack_start:'
         yield from asm.ZeroDirective(asm.WordOffset(self.stack_size)).lines()
+        for arg in reversed(self.entry_args):
+            yield from arg.lines()
         yield b'.word all_is_win'
         yield b'stack_end:'
         for label, directive in self.state_data.items():

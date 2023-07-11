@@ -7,6 +7,7 @@ ISA.
 
 Key features of Halt is Defeat:
  * Function overloading
+ * Time-travel semantics
  * Stack-allocated variable-length arrays
  * Overly-complicated type coercion rules
  * Memory safety through bounds checking
@@ -71,7 +72,7 @@ This behavior is necessary in order for Halt is Defeat to ensure that
 your programs are undefeatable.  Since "Halt is Defeat", the program
 must never halt, so upon returning from ``@is_you()``, Halt is Defeat
 code emits the "win" flag (as seen in the output from ``spasm``) and
-then enters into terminal non-termination.
+then loops forever.
 
 If running under the ``spasm`` emulator, you can always issue a keyboard
 interrupt (ctrl-c) to forcibly stop the running program.  Attempting to
@@ -82,14 +83,14 @@ A taste of defeat
 -----------------
 
 Defeat functions have names starting with ``!``, and may result in
-defeat if called.  ``!is_defeat()`` always causes defeat.  Defeat
+defeat if called.  ``!is_defeat()`` always results in defeat.  Defeat
 functions cannot be called directly from within you functions, but you
 can create a try block within you to safely run code which may lead to
 defeat.
 
-In this example we use the catch handler, which treats defeat similarly
-to exceptions in other languages.  The catch block is run when defeat is
-reached:
+In this example we use the ``catch`` handler, which treats defeat
+similarly to exceptions in other languages.  The ``catch`` block is run
+when defeat is reached:
 
 .. code::
 
@@ -117,20 +118,20 @@ Output:
 
 Note that defeat's utility as a replacement for exceptions is limited.
 There is only one form of defeat, and try blocks can ONLY be used within
-a "you" context.  Since try blocks create a defeat context within the
-block, so you cannot nest try blocks as in other languages.
+a "you" context.  Try blocks create a defeat context within the block,
+so you cannot nest try blocks as in other languages.
 
-Defeat is not the same thing as an exception, however.  The purpose of
-defeat is not to represent an exceptional condition that needs to be
-handled -- the purpose of defeat is to be avoided!
+However, the purpose of defeat is not to represent an exceptional
+condition -- the purpose of defeat is to be avoided!
 
 Time travel
 -----------
 Sure, it's nice to know when you've made a mistake.  But more often than
 not, we really just wish we could go back and undo it.  In HiD, you can!
 
-The ``undo`` block works similarly to ``catch``, but it goes back in
-time and prevents the try block from running if it would end in defeat:
+The ``undo`` handler works similarly to ``catch``, but it goes back in
+time and prevents the ``try`` block from running if it would result in
+defeat:
 
 .. code::
 
@@ -199,3 +200,49 @@ which performs a jump if not jumping would lead to halting.
 
 Computational astrology
 -----------------------
+
+
+Other features
+==============
+
+Command-line arguments
+----------------------
+Halt is Defeat makes use of Sphinx's robust argument specifiers, which I
+added to Sphinx mostly so that Halt is Defeat could make use of them.
+
+If you want command-line arguments, you can write your ``@is_you``
+function with the signature ``void @is_you(const string[] args)``
+
+Does your program take integers as input?  Don't want to write code to
+parse them?  Don't worry!  You can get ``spasm`` to do it for you!
+The signature ``void @is_you(const int[] args)`` specifies that the
+inputs should be integers, which ``spasm`` will be parse (in base 10)
+from the command line arguments.
+
+You can even mix and match:
+``void @is_you(string mode, const int[] args)``
+
+In addition to convenience, an advantage to this is that the cycle count
+reported by ``spasm`` won't get artificially inflated by parsing code,
+which is useful in evaluating the performance of your time-traveling
+algorithms.
+
+Caveats:
+
+- You may only have at most one array in the parameters of ``@is_you``.
+  If you want anything more complicated you'll need to take an array of
+  strings and do the parsing yourself.
+- Neither bool nor bool[] are not allowed as parameters to ``@is_you``
+- Although int[] and byte[] may be either const or non-const, string[]
+  passed to ``@is_you()`` must be const.  If you want a mutable array of
+  string arguments, you'll need to copy them over:
+
+.. code::
+
+    void @is_you(const string[] args) {
+        string mutargs[args.length];
+        for (int i = 0; i < args.length; i += 1) {
+            mutargs[i] = args[i];
+        }
+    }
+

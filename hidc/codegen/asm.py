@@ -446,6 +446,19 @@ class ZeroDirective(Directive):
     def lines(self):
         yield b'.zero ' + bytes(self.size)
 
+@dc.dataclass
+class ArgDirective(Directive):
+    var_name: str
+    format: str
+    params: tuple[str, ...] = ()
+
+    def lines(self):
+        yield (b'.arg ' + b' '.join([
+            p.encode('utf-8')
+            for p in (self.var_name, self.format, *self.params)
+        ]))
+
+
 def _store_const(*_):
     raise InternalCompilerError('Cannot store in const section')
 
