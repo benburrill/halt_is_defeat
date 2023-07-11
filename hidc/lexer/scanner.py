@@ -17,6 +17,8 @@ class SourceCode(Sequence):
         return cls(filename, string.split('\n'))
 
     def __getitem__(self, item):
+        if not self.lines:
+            return ''
         return self.lines[item]
 
     def __len__(self):
