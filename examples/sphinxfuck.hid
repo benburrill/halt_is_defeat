@@ -1,0 +1,103 @@
+// Sphinxfuck interpreter
+// An brainfuck dialect that predicts the future
+// See the original handwritten Sphinx assembly interpreter:
+// https://github.com/benburrill/sphinx/blob/main/examples/sphinxfuck.s
+// for more details.
+
+void @sphinxfuck(string src, byte[] mem, const byte[] input) {
+    // For reporting number of steps taken, like spasm's cycle count.
+    // NOTE: there's a good reason why steps is byte rather than int!
+    // Under emulation, spasm won't detect a loop until the sphinxfuck
+    // program has been in a loop long enough for steps to wrap around.
+    byte steps = 0;
+
+    try {
+        int pc = 0;
+        int ip = 0;
+        int dp = 0;
+
+        while (true) {
+            !truth_is_defeat(pc >= src.length);
+            byte cur = src[pc];
+            if (cur == '>') {
+                dp += 1;
+            } else if (cur == '<') {
+                dp -= 1;
+            } else if (cur == '+') {
+                mem[dp] += 1;
+            } else if (cur == '-') {
+                mem[dp] -= 1;
+            } else if (cur == '.') {
+                // Output as int rather than byte
+                println(mem[dp] is int);
+            } else if (cur == ',') {
+                if (ip < input.length) {
+                    mem[dp] = input[ip];
+                    ip += 1;
+                } else {
+                    mem[dp] = 0;
+                }
+            } else if (cur == '!') {
+                !truth_is_defeat(not mem[dp]);
+            } else if (cur == '?') {
+                !truth_is_defeat(mem[dp] is bool);
+            } else if (cur == '[') {
+                preempt {
+                    pc = match('[', ')', src, pc, 1);
+                }
+            } else if (cur == ']') {
+                preempt {
+                    pc = match(']', '(', src, pc, -1);
+                }
+            } else if (cur == '@') {
+                println("Reached sphinxfuck @");
+                print("Steps: ");
+                println(steps is int);
+            }
+
+            pc += 1;
+            steps += 1;
+        }
+    } catch {
+        println("Sphinxfuck halted");
+        print("Steps: ");
+        println(steps is int);
+    }
+}
+
+
+int match(byte open, byte close, string s, int idx, int dir) {
+    int depth = 0;
+    while (true) {
+        byte cur = s[idx];
+        if (cur == open) {
+            depth += 1;
+        } else if (cur == close) {
+            depth -= 1;
+        }
+
+        if (not depth) {
+            return idx;
+        }
+
+        idx += dir;
+    }
+}
+
+// A nice big buffer for sphinxfuck if needed
+byte buf[1000];
+
+void @is_you(byte[] args) {
+    byte input_num = 13;
+    if (args) {
+        input_num = args[0];
+    }
+
+    @sphinxfuck(
+        // This program computes input % 2 by predicting the future and
+        // getting stuck in an infinite loop if the number is odd.
+        "[>+.<@,(!--]?!)>.<@(]",
+        buf,
+        [input_num]
+    );
+}
