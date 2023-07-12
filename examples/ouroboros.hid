@@ -1,0 +1,36 @@
+// This is a similarly self-referential program to
+// https://github.com/benburrill/sphinx/blob/main/examples/self_inquiry.s
+// That assembly version is simpler and easier to follow I think.
+
+
+// Recall that the preempt block will run if not running the preempt
+// block would lead to defeat.
+// In the program below, running the preempt block causes defeat, so
+// the preempt block will be run if the same preempt block (on a future
+// iteration of the loop) would be run.
+// The situation is identical, so we may say the preempt block should be
+// run if the preempt block should be run -- it's self-referential!
+
+// So should the preempt block be run?
+// Spoiler: the answer is no.
+// Again, the preempt block will run if *not running* the preempt block
+// would lead to defeat.  By the same deterministic reasoning that makes
+// this self-referential in the first place, if the preempt block were
+// not run, then it can never be run -- so it should not be run.
+
+// So this program is non-ambiguous, and by similar reasoning, you can't
+// make a contradictory version either.
+
+
+void @is_you() {
+    try {
+        println("preempt block will not run");
+        while (true) {
+            preempt {
+                !is_defeat();
+            }
+        }
+    } undo {
+        println("preempt block would run");
+    }
+}
