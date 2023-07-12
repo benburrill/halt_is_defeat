@@ -16,7 +16,8 @@
 // Again, the preempt block will run if *not running* the preempt block
 // would lead to defeat.  By the same deterministic reasoning that makes
 // this self-referential in the first place, if the preempt block were
-// not run, then it can never be run -- so it should not be run.
+// not run, then it can NEVER be run.  And if it's never run, the loop
+// would never reach defeat.  So the preempt block should not be run.
 
 // So this program is non-ambiguous, and by similar reasoning, you can't
 // make a contradictory version either.
