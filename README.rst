@@ -270,17 +270,17 @@ Fatal errors and undefined behavior
 -----------------------------------
 
 Fatal errors occur when invalid operations are performed, such as
-dividing by 0 or if the stack would overflow.  Errors are different from
-defeat, and in fact provide safety from defeat similar to the ``win``
-state.  As a result of this, the path of execution leading up to an
-error may not have actually been run if the conditions that produced the
-error were fixed.  For example, in a try/undo block you might have a
-path of execution which "should" lead to defeat, but instead causes a
-stack overflow.  This would cause code which otherwise wouldn't be run
-if the stack size was increased to be run.
+dividing by 0.  Errors are different from defeat, and in fact provide
+safety from defeat similar to the ``win`` state.  As a result of this,
+the path of execution leading up to an error might not have actually
+occurred if the conditions that produced the error were fixed.  For
+example, in a try/undo block you might have a path of execution which
+"should" lead to defeat, but instead causes a stack overflow.  This
+could cause code to run which otherwise wouldn't if the stack size were
+increased, possibly printing "incorrect" output leading up to the error.
 
-This can be confusing, but it is helpful in debugging exactly what
-conditions produced the error.
+This can be confusing, but it is much more useful in debugging the
+causes of an error than if errors were to cause defeat.
 
 Errors can also be produced in user code with ``all_is_broken()``.
 
