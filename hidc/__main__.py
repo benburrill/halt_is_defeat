@@ -30,8 +30,8 @@ hidc.add_argument(
 
 hidc.add_argument(
     '-s', dest='stack_size',
-    help='size of stack available to the program [default: 100 words]',
-    type=int, default=100
+    help='size of stack available to the program [default: 1000 words]',
+    type=int, default=1000
 )
 
 hidc.add_argument(

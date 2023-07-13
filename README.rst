@@ -249,11 +249,12 @@ Caveats:
 Increasing the word size and stack size
 ---------------------------------------
 
-By default, ``hidc`` targets a 16-bit word size, and provides only a
-meager 100 words of stack space.  These can both be increased.
+By default, ``hidc`` targets a 16-bit word size, and provides a
+picture's worth (1000 words) of stack space.
+These can both be increased.
 
 - To change the word size, use ``-m``, eg ``-m24`` to target 24 bits.
-- To change the stack size, use ``-s``, eg ``-s1000`` for 1000 words.
+- To change the stack size, use ``-s``, eg ``-s2000`` for 2000 words.
 
 As an alternative to increasing the stack size, you may also consider
 making your variables/arrays global, and where possible making them
@@ -265,6 +266,12 @@ of emulation under ``spasm`` -- you may want to take things slow.
 There's no prize for writing a program that requires more RAM in order
 to emulate than could fit in the observable universe, it just means you
 need a better computer.
+
+If using 24 bit words, I recommend decreasing the stack size to 100
+words, at least in testing, so that if you accidentally write a 24-bit
+loop ``spasm`` won't need more than 8 GB should that loop need to be
+predicted (assuming no globals).  If using more than 24 bits, you are on
+your own, may god have mercy.
 
 Fatal errors and undefined behavior
 -----------------------------------
