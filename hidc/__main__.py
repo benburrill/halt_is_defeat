@@ -19,23 +19,28 @@ hidc.add_argument(
 
 hidc.add_argument(
     '-o', metavar='FILE', dest='output',
-    help='write output to file, default: <input>.s'
+    help='write output to file [default: <input>.s]'
 )
 
 hidc.add_argument(
     '-m', dest='word_size',
-    help='word size of the target machine in bits, default: 16 bits',
+    help='word size of the target machine in bits [default: 16 bit]',
     type=int, default=16
 )
 
 hidc.add_argument(
     '-s', dest='stack_size',
-    help='size of stack available to the program, default: 100 words',
+    help='size of stack available to the program [default: 100 words]',
     type=int, default=100
 )
 
 hidc.add_argument(
     '--dump-ast', help='output typechecked AST rather than compiling',
+    action='store_true'
+)
+
+hidc.add_argument(
+    '--unchecked', help='disable all runtime checks',
     action='store_true'
 )
 
@@ -65,7 +70,7 @@ def main():
         #  But currently generate calls make_funcs
         output = args.output if args.output is not None else args.input + '.s'
         with open(output, 'wb') as f:
-            code_gen = CodeGen.from_program(ast, args.word_size // 8, args.stack_size)
+            code_gen = CodeGen.from_program(ast, args.word_size // 8, args.stack_size, args.unchecked)
             for line in code_gen.generate():
                 f.write(line)
                 f.write(b'\n')

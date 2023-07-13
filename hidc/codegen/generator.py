@@ -1,8 +1,10 @@
 from . import asm
 from . import stdlib
+from .tracker import Tracker
+from .symbols import ConcreteType, ConcreteArrayType, ConcreteSignature, AccessMode
+
 from hidc import ast
 from hidc.ast import DataType, ArrayType, ExitMode
-from .symbols import ConcreteType, ConcreteArrayType, ConcreteSignature, AccessMode
 from hidc.errors import CodeGenError, InternalCompilerError
 
 from collections import deque, ChainMap
@@ -45,6 +47,10 @@ class StackPoint:
 
     def __bool__(self):
         return bool(self.offset or self.array_num or self.static_array_size)
+
+    @property
+    def static_size(self):
+        return self.offset + self.static_array_size
 
 
 @dc.dataclass(frozen=True)
@@ -148,12 +154,14 @@ class CodeGen:
     global_decls: dict[str, ast.Declaration]
     word_size: int = 2
     stack_size: int = 50 # in words
+    unchecked: bool = False
 
     stack: StackPoint                                          = dc.field(init=False, default=StackPoint())
     allocated_arrays: list[ArrayRef]                           = dc.field(init=False, default_factory=list)
     global_vars: dict[str, asm.Accessor|ArrayRef]              = dc.field(init=False, default_factory=dict)
     local_vars: ChainMap[str, asm.Accessor|ArrayRef]           = dc.field(init=False, default_factory=ChainMap)
     return_address: asm.Accessor                               = dc.field(init=False, default=None)
+    checkpoints: Tracker                                       = dc.field(init=False, default_factory=Tracker)
 
     numbered_labels: dict[str, int]                            = dc.field(init=False, default_factory=dict)
     string_labels: dict[bytes, asm.LabelRef]                   = dc.field(init=False, default_factory=dict)
@@ -270,7 +278,7 @@ class CodeGen:
         self.label_for_func(ConcreteSignature(ast.Ident.you('is_you'), tuple(concrete_types)))
 
     @classmethod
-    def from_program(cls, program: ast.Program, word_size, stack_size):
+    def from_program(cls, program: ast.Program, word_size, stack_size, unchecked):
         func_decls = {}
         var_decls = {}
         for func_decl in program.func_decls:
@@ -278,7 +286,7 @@ class CodeGen:
             func_decls.setdefault(func_decl.name, {})[param_types] = func_decl
         for var_decl in program.var_decls:
             var_decls[var_decl.var.name] = var_decl
-        return cls(func_decls, var_decls, word_size, stack_size)
+        return cls(func_decls, var_decls, word_size, stack_size, unchecked)
 
     def generate(self):
         self.make_funcs()
@@ -338,6 +346,7 @@ class CodeGen:
     def gen_func(self, csig: ConcreteSignature, func: ast.FuncDeclaration):
         assert self.stack == StackPoint(0)
         self.local_vars = ChainMap()
+        self.checkpoints = Tracker()
 
         # In defeat functions, we must assume we're being called from
         # a try/catch block, so use variable defeat.
@@ -358,6 +367,15 @@ class CodeGen:
 
         yield asm.Metadata(f'Function {func.signature}:')
         yield asm.Label(self.func_labels[csig])
+
+        if not self.unchecked:
+            no_overflow = self.add_label('no_overflow')
+            yield asm.Jump(no_overflow)
+            yield asm.Sub(self.r1, asm.State(self.fp), asm.State(self.ap))
+            yield asm.Hgeu(asm.State(self.r1), self.checkpoints.add(self.stack.static_size))
+            yield from self.goto(stdlib.stack_overflow)
+            yield asm.Label(no_overflow)
+
         yield from self.gen_block(func.body)
 
         # Return doesn't actually pop, it only restores ap.
@@ -368,11 +386,13 @@ class CodeGen:
         cleanup_args = list(self.pop(bubble))
         assert not cleanup_args, 'Should not require any instructions to be clean up arguments'
         assert self.stack == StackPoint(0)
+        self.checkpoints.pop_level()
 
     def gen_block(self, block: ast.Block):
         match block:
             case ast.CodeBlock():
                 start_point = self.stack
+                self.checkpoints.push_level()
                 self.local_vars = self.local_vars.new_child()
                 yield asm.Metadata(add_indent=1)
 
@@ -393,6 +413,7 @@ class CodeGen:
 
                 yield asm.Metadata(add_indent=-1)
                 self.local_vars = self.local_vars.parents
+                self.checkpoints.pop_level()
                 assert self.stack == start_point
             case ast.IfBlock():
                 else_label = self.add_label('else')
@@ -776,12 +797,34 @@ class CodeGen:
                 )
             case ast.ArrayInitializer():
                 # TODO: stack overflow / negative length detection
-                length_bubble = yield from self.push_expr(r_out, expr.length)
-                length = yield from length_bubble.get_fast(r_out)
+                length_bubble = yield from self.push_expr(self.r0, expr.length)
+                length = yield from length_bubble.get_fast(self.r0)
                 origin_bubble = self.reserve_word()
                 yield from origin_bubble.value.set(asm.State(self.ap))
-                size = yield from self.get_array_size(r_out, expr.type.el_type, length)
+                size = yield from self.get_array_size(self.r0, expr.type.el_type, length)
                 yield asm.Metadata('Array allocation (ArrayInitializer)')
+                no_overflow = self.add_label('no_overflow')
+                yield asm.Jump(no_overflow)
+                yield asm.Sub(self.r1, asm.State(self.fp), asm.State(self.ap))
+
+                # Current static array size is already included in ap
+                cur_static_array = self.stack.static_array_size
+                yield asm.Sub(
+                    self.r1, asm.State(self.r1),
+                    self.checkpoints.add(self.stack.static_size).map(
+                        lambda max_size: max_size - cur_static_array
+                    )
+                )
+
+                # TODO: in the case of word-celled arrays, the length
+                #  might be bad, but the size would overflow and appear
+                #  fine.  Is it worth checking for that?
+                yield asm.Hgeu(asm.State(self.r1), size)
+                yield from self.goto(stdlib.stack_overflow)
+
+                yield asm.Label(no_overflow)
+
+
                 yield asm.Add(self.ap, asm.State(self.ap), size)
                 # It should always be RW, but we'll leave it up to the
                 # typechecker to make such decisions.
@@ -1061,7 +1104,7 @@ class CodeGen:
         # not so much.
         # TODO: Potential future optimization - substitute things like
         #  !truth_is_defeat(not (x == y)) with !truth_is_defeat(x != y)
-        #  not is expensive.
+        #  not is kinda expensive.
 
         if instr := compare_map.get(type(expr)):
             left_bubble = yield from self.eval_expr(self.r0, expr.left, keep=not self.is_safe(expr.right))
@@ -1079,6 +1122,12 @@ class CodeGen:
                     yield asm.Jump(self.effective_defeat)
                 yield asm.Halt()
         elif expr.type == DataType.BOOL:
+            if type(expr) is ast.Not:
+                expr = expr.arg
+                instr = asm.Heq
+            else:
+                instr = asm.Hne
+
             if type(expr) is ast.IntToBool:
                 expr = expr.expr
             # I think get_expr_value is better than bool_expr_branch
@@ -1086,7 +1135,7 @@ class CodeGen:
             value = yield from self.get_expr_value(self.r1, expr)
             if self.effective_defeat != stdlib.halt:
                 yield asm.Jump(self.effective_defeat)
-            yield asm.Hne(value, asm.IntLiteral(0))
+            yield instr(value, asm.IntLiteral(0))
         else:
             assert False
 
@@ -1094,7 +1143,7 @@ class CodeGen:
                          arg_left:asm.AssemblyExpression,
                          arg_right:asm.AssemblyExpression):
         if instr := arith_map.get(op_type):
-            if op_type in {ast.Div, ast.Mod}:
+            if op_type in {ast.Div, ast.Mod} and not self.unchecked:
                 yield asm.Jump(div_allowed := self.add_label('div_allowed'))
                 yield asm.Hne(arg_right, asm.IntLiteral(0))
                 yield from self.goto(stdlib.division_by_zero)
@@ -1150,6 +1199,7 @@ class CodeGen:
     #     yield asm.Label(safe_length)
 
     def check_index(self, idx_arg: asm.AssemblyExpression, length_arg: asm.AssemblyExpression):
+        if self.unchecked: return
         index_in_bounds = self.add_label('index_in_bounds')
 
         # The length should always be positive signed.
@@ -1328,6 +1378,7 @@ class CodeGen:
         prev = self.stack
         cur = prev.add(offset=1)
         self.stack = cur
+        self.checkpoints.update(self.stack.static_size)
         return ValueBubble(prev, cur, asm.IndirectByte(
             asm.Section.STATE, asm.State(self.fp),
             asm.IntLiteral(-cur.offset)
@@ -1337,6 +1388,7 @@ class CodeGen:
         prev = self.stack
         cur = prev.add(offset=self.word_size)
         self.stack = cur
+        self.checkpoints.update(self.stack.static_size)
         return ValueBubble(prev, cur, asm.Indirect(
             asm.Section.STATE, asm.State(self.fp),
             asm.IntLiteral(-cur.offset)
@@ -1388,6 +1440,7 @@ class CodeGen:
         ref = ArrayRef(val_type, origin=origin_bubble.value, length=length_bubble.value)
         self.allocated_arrays.append(ref)
         self.stack = cur
+        if static_size: self.checkpoints.update(self.stack.static_size)
         assert len(self.allocated_arrays) == self.stack.array_num
         return ValueBubble(bubble.prev, cur, ref)
 

@@ -10,7 +10,7 @@ Key features of Halt is Defeat:
  * Time-travel semantics
  * Stack-allocated variable-length arrays
  * Overly-complicated type coercion rules
- * Memory safety through bounds checking
+ * Memory safety through bounds checking and stack-overflow detection
  * Safety from defeat
  * Tail-call elimination (TODO)
  * P = NP

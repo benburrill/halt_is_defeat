@@ -112,6 +112,31 @@ class IntLiteral(Immediate):
     def access_byte(self):
         return IntLiteral(self.data & 0xFF, self.is_byte)
 
+@dc.dataclass
+class DynamicValue(Immediate):
+    _data: int = dc.field(init=False, default=None)
+    _finalized: bool = dc.field(init=False, default=False)
+    maps: list[ty.Callable] = dc.field(init=False, default_factory=list)
+
+    def __bytes__(self):
+        if not self._finalized:
+            raise InternalCompilerError('Not finalized')
+        return str(self._data).encode('utf-8')
+
+    def finalize(self, data):
+        if self._finalized:
+            raise InternalCompilerError('Already finalized')
+
+        for f in self.maps:
+            data = f(data)
+
+        self._data = data
+        self._finalized = True
+
+    def map(self, func):
+        self.maps.append(func)
+        return self
+
 @dc.dataclass(frozen=True)
 class WordOffset(Immediate):
     words: int
