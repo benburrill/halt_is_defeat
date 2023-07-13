@@ -286,12 +286,14 @@ Errors can also be produced in user code with ``all_is_broken()``.
 
 Although many operations in HiD are checked and will produce errors, the
 following are undefined behavior:
+
 - Accessing uninitialized strings in dynamically allocated arrays
 - Dynamically allocating an array with negative length (usually this
   will be caught by stack-overflow detection, but not necessarily)
 
 Additionally, if the ``--unchecked`` flag is passed, all previously
 checked operations become undefined behavior:
+
 - Division by 0
 - Indexing an array out of bounds
 - Stack overflow
