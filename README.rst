@@ -9,7 +9,7 @@ Key features of Halt is Defeat:
  * Function overloading
  * Time-travel semantics
  * Stack-allocated variable-length arrays
- * Overly-complicated type coercion rules
+ * Type coercion and inference of ambiguous expressions
  * Memory safety through bounds checking and stack-overflow detection
  * Safety from defeat
  * Tail-call elimination (TODO)
@@ -265,3 +265,36 @@ of emulation under ``spasm`` -- you may want to take things slow.
 There's no prize for writing a program that requires more RAM in order
 to emulate than could fit in the observable universe, it just means you
 need a better computer.
+
+Fatal errors and undefined behavior
+-----------------------------------
+
+Fatal errors occur when invalid operations are performed, such as
+dividing by 0 or if the stack would overflow.  Errors are different from
+defeat, and in fact provide safety from defeat similar to the ``win``
+state.  As a result of this, the path of execution leading up to an
+error may not have actually been run if the conditions that produced the
+error were fixed.  For example, in a try/undo block you might have a
+path of execution which "should" lead to defeat, but instead causes a
+stack overflow.  This would cause code which otherwise wouldn't be run
+if the stack size was increased to be run.
+
+This can be confusing, but it is helpful in debugging exactly what
+conditions produced the error.
+
+Errors can also be produced in user code with ``all_is_broken()``.
+
+Although many operations in HiD are checked and will produce errors, the
+following are undefined behavior:
+- Accessing uninitialized strings in dynamically allocated arrays
+- Dynamically allocating an array with negative length (usually this
+  will be caught by stack-overflow detection, but not necessarily)
+
+Additionally, if the ``--unchecked`` flag is passed, all previously
+checked operations become undefined behavior:
+- Division by 0
+- Indexing an array out of bounds
+- Stack overflow
+
+Be aware that HiD's nasal demons can time travel, so undefined behavior
+may result in a program's defeat before it even starts, etc.
