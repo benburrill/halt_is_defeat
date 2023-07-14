@@ -52,6 +52,9 @@ class Ident(Token):
     def __repr__(self):
         return f'<IdentToken {self.name}>'
 
+    def __str__(self):
+        return self.name
+
 
 class EnumToken(Token, enum.Enum):
     # Python 3.11 decided to completely change how Enums with mixins
@@ -147,6 +150,9 @@ class BlockToken(EnumToken):
     FOR = 'for'
     TRY = 'try'
     UNDO = 'undo'
+    # TODO: rename catch to stop?  Though it's such a common programming
+    #  word I've already used it as a variable more than once in my HiD
+    #  programs...
     CATCH = 'catch'
     PREEMPT = 'preempt'
 

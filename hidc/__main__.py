@@ -1,5 +1,6 @@
 from hidc.lexer import SourceCode
 from hidc.parser import parse
+from hidc.ast import typecheck
 from hidc.codegen import CodeGen
 from hidc.errors import CompilerError
 from pprint import pprint
@@ -58,7 +59,7 @@ def main():
         return 1
 
     try:
-        ast = parse(source).checked()
+        ast = typecheck(parse(source))
 
         if args.dump_ast:
             pprint(ast)

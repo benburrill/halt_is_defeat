@@ -2,17 +2,16 @@
 Halt is Defeat
 ==============
 
-Halt is Defeat is a prophecy-optimized language targeting the Sphinx
-ISA.
+Halt is Defeat is an oracle-oriented prophetic (OOP) language targeting
+the Sphinx ISA.
 
 Key features of Halt is Defeat:
- * Function overloading
- * Time-travel semantics
- * Stack-allocated variable-length arrays
- * Type coercion and inference of ambiguous expressions
+ * Negative-cost abstractions with time-travel semantics
  * Memory safety through bounds checking and stack-overflow detection
  * Safety from defeat
- * Tail-call elimination (TODO)
+ * Function overloading
+ * Stack-allocated variable-length arrays
+ * Type coercion and inference of ambiguous expressions
  * P = NP
 
 
@@ -200,6 +199,11 @@ which performs a jump if not jumping would lead to halting.
 
 Computational astrology
 -----------------------
+While the try/undo construct can be useful on its own, the most powerful
+and flexible tool in your temporal arsenal is ``preempt``.  It works a
+bit like an inside-out try.  The ``preempt`` block is run if not running
+the ``preempt`` block would lead to defeat.  It is used within ``try``
+blocks.
 
 
 Other features
@@ -266,11 +270,11 @@ There's no prize for writing a program that requires more RAM in order
 to emulate than could fit in the observable universe, it just means you
 need a better computer.
 
-If using 24 bit words, I recommend decreasing the stack size to 100
-words for testing, so that if you accidentally write a tight 24-bit loop
-``spasm`` won't need more than 8 GB if that loop needs to be predicted
-(assuming no globals).  If using more than 24 bits, you are on your own,
-god help you.
+If using 24 bit words, I'd recommend decreasing the stack size to 100
+words or less for testing, so that if you accidentally write a tight
+24-bit loop ``spasm`` won't need more than 8 GB if that loop needs to be
+predicted (assuming no globals).  If using more than 24 bits, you are on
+your own, god help you.
 
 Fatal errors and undefined behavior
 -----------------------------------
@@ -279,14 +283,14 @@ Fatal errors occur when invalid operations are performed, such as
 dividing by 0.  Errors are different from defeat, and in fact provide
 safety from defeat similar to the ``win`` state.  As a result of this,
 the path of execution leading up to an error might not have actually
-occurred if the conditions that produced the error were fixed.  For
-example, in a try/undo block you might have a path of execution which
-"should" lead to defeat, but instead causes a stack overflow.  This
-could cause code to run which otherwise wouldn't if the stack size were
-increased, possibly printing "incorrect" output leading up to the error.
+occurred if the conditions that produced the error were fixed.
 
-This can be confusing, but it is much more useful in debugging the
-causes of an error than if errors were to cause defeat.
+For example, in a try/undo block you might have a path of execution
+which "should" lead to defeat, but instead causes a stack overflow.
+This could cause code to run which otherwise wouldn't if the stack size
+were increased, possibly printing "incorrect" output leading up to the
+error.  This can be confusing, but it is much more useful in debugging
+the causes of an error than if such errors caused defeat.
 
 Errors can also be produced in user code with ``all_is_broken()``.
 
@@ -295,13 +299,13 @@ following are undefined behavior:
 
 - Accessing uninitialized strings in dynamically allocated arrays
 - Dynamically allocating an array with negative length (usually this
-  will be caught by stack-overflow detection, but not necessarily)
+  will produce a stack-overflow error, but not necessarily)
 
 Additionally, if the ``--unchecked`` flag is passed, all previously
 checked operations become undefined behavior:
 
-- Division by 0
-- Indexing an array out of bounds
+- Division or modulo by 0
+- Indexing an array or string out of bounds
 - Stack overflow
 
 Be aware that HiD's nasal demons can time travel, so undefined behavior

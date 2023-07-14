@@ -646,6 +646,9 @@ class CodeGen:
         # will be treated as non-volatile, otherwise copied to stack.
         result: asm.AssemblyExpression = asm.State(r_out)
         match expr:
+            # TODO: change this to set is_byte if the expression was
+            #  originally a character literal, not if it is a ByteValue
+            #  or IntValue.
             case ast.ByteValue():
                 result = asm.IntLiteral(expr.data, is_byte=True)
             case ast.IntValue():

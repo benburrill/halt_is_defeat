@@ -242,39 +242,33 @@ class FuncCall(Expression):
 
     def evaluate(self, env):
         args = tuple(arg.evaluate(env) for arg in self.args)
-        arg_sig = FuncSignature(self.func, tuple(arg.type for arg in args))
+        arg_sig = tuple(arg.type for arg in args)
         sig = arg_sig
 
         try:
-            func = env.funcs[sig]
+            func = env.funcs[self.func][arg_sig]
         except KeyError:
-            # TODO: really, env.funcs should map function names to dicts
-            #  of function signatures to functions, so we don't need to
-            #  iterate over all possible functions, but this is fine...
-            for sig, func in env.funcs.items():
-                if sig.name == self.func and len(sig.arg_types) == len(args):
-                    for arg, sig_type in zip(args, sig.arg_types):
+            for sig, func in env.funcs.get(self.func, {}).items():
+                if len(sig) == len(args):
+                    for arg, sig_type in zip(args, sig):
                         if not arg.coercible(sig_type):
                             break
                     else:
                         break
             else:
+                params = ', '.join(map(str, arg_sig))
                 raise TypeCheckError(
-                    f'No matching function for signature {arg_sig}',
+                    f'No matching function for signature {self.func}({params})',
                     self.span
                 ) from None
 
         return FuncCall(
             self.func, tuple([
                 arg.coerce(sig_type)
-                for arg, sig_type in zip(args, sig.arg_types)
+                for arg, sig_type in zip(args, sig)
             ]),
             self.span, func.ret_type
         )
-
-    @property
-    def signature(self):
-        return FuncSignature(self.func, tuple(a.type for a in self.args))
 
 
 # Parameters are also not really expressions, but we're going to pretend

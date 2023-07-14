@@ -1,13 +1,14 @@
-from hidc.parser import parse
-from hidc.errors import TypeCheckError
 from hidc.lexer import SourceCode
+from hidc.parser import parse
+from hidc.ast import typecheck
+from hidc.errors import TypeCheckError
 
 from pytest import raises
 
 
 def assert_good(string, **options):
     unchecked = parse(SourceCode.from_string(string))
-    checked = unchecked.checked(options)
+    checked = typecheck(unchecked, **options)
     # These are dummy assertions which are kinda pointless to check
     # Ideally I'd like to walk through the tree and make sure all types
     # match up, as they should after successful typechecking
@@ -17,7 +18,7 @@ def assert_good(string, **options):
 def assert_bad(string, **options):
     unchecked = parse(SourceCode.from_string(string))
     with raises(TypeCheckError):
-        unchecked.checked(options)
+        typecheck(unchecked, **options)
 
 
 def test_return_type():
@@ -559,4 +560,49 @@ def test_undeclared():
         void f() {
             g();
         }
+    """)
+
+def test_redecl():
+    assert_bad("""
+        int x = 10;
+        int x = 5;
+    """)
+
+    assert_bad("""
+        void f() {
+            int x = 10;
+            int x = 5;
+        }
+    """)
+
+    assert_good("""
+        int x = 10;
+        void f() {
+            // Shadowing of globals allowed
+            int x = 5;
+        }
+    """)
+
+    assert_bad("""
+        void f() {
+            int x = 10;
+            if (true) {
+                // Shadowing of locals not allowed
+                int x = 5;
+            }
+        }
+    """)
+
+    assert_good("""
+        void f(int x) {}
+        void f(byte x) {}
+    """)
+
+    assert_bad("""
+        void f(int x) {}
+        void f(int x) {}
+    """)
+
+    assert_bad("""
+        void println(int x) {}
     """)

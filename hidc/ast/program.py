@@ -1,6 +1,6 @@
 from .blocks import CodeBlock, ExitMode
 from .statements import Declaration, ReturnStatement
-from .symbols import Type, DataType, ArrayType, FuncSignature, Ident, Flavor, Environment, VarTable
+from .symbols import Type, DataType, ArrayType, Ident, Flavor, Environment, VarTable
 from .expressions import Parameter
 from hidc.lexer import Span
 from hidc.utils.data_abc import Abstract, DataABC
@@ -12,19 +12,20 @@ from collections.abc import Sequence
 
 class FuncDefinition(DataABC):
     ret_type: Abstract[DataType]
-    name: Ident
-    signature: Abstract[Sequence[Type]]
+    name: Abstract[Ident]
+    param_types: Abstract[tuple[Type, ...]]
+
+    @property
+    def signature(self):
+        params = ', '.join(map(str, self.param_types))
+        return f'{self.name}({params})'
 
 
 @dc.dataclass(frozen=True)
 class BuiltinStub(FuncDefinition):
     ret_type: DataType
     name: Ident
-    param_types: Sequence[Type]
-
-    @property
-    def signature(self):
-        return FuncSignature(self.name, self.param_types)
+    param_types: tuple[Type, ...]
 
 
 @dc.dataclass(frozen=True)
@@ -36,11 +37,8 @@ class FuncDeclaration(FuncDefinition):
     body: CodeBlock
 
     @property
-    def signature(self):
-        return FuncSignature(
-            self.name,
-            tuple(p.type for p in self.params)
-        )
+    def param_types(self):
+        return tuple(p.type for p in self.params)
 
     def evaluate(self, env):
         new_env = env.new_child(self.ret_type)
@@ -62,58 +60,40 @@ class FuncDeclaration(FuncDefinition):
         return FuncDeclaration(self.span, self.ret_type, self.name, self.params, body)
 
 
-builtin_funcs = {
-    stub.signature: stub
-    for stub in [
-        BuiltinStub(DataType.VOID, Ident.defeat('is_defeat'), ()),
-        BuiltinStub(DataType.VOID, Ident.defeat('truth_is_defeat'), (DataType.BOOL,)),
-        # TODO: I think I want to rename "print" to "write"
-        BuiltinStub(DataType.VOID, Ident('print'), (DataType.STRING,)),
-        BuiltinStub(DataType.VOID, Ident('print'), (ArrayType(DataType.BYTE, const=True),)),
-        BuiltinStub(DataType.VOID, Ident('print'), (DataType.INT,)),
-        BuiltinStub(DataType.VOID, Ident('print'), (DataType.BYTE,)),
-        BuiltinStub(DataType.VOID, Ident('print'), (DataType.BOOL,)),
-        BuiltinStub(DataType.VOID, Ident('println'), (DataType.STRING,)),
-        BuiltinStub(DataType.VOID, Ident('println'), (ArrayType(DataType.BYTE, const=True),)),
-        BuiltinStub(DataType.VOID, Ident('println'), (DataType.INT,)),
-        BuiltinStub(DataType.VOID, Ident('println'), (DataType.BYTE,)),
-        BuiltinStub(DataType.VOID, Ident('println'), (DataType.BOOL,)),
-        BuiltinStub(DataType.VOID, Ident('println'), ()),
-        BuiltinStub(DataType.VOID, Ident('all_is_win'), ()),
-        BuiltinStub(DataType.VOID, Ident('all_is_broken'), ())
-        # TODO: also sleep and debug?  (level_is_debug?)
-    ]
-}
+builtin_stubs = (
+    BuiltinStub(DataType.VOID, Ident.defeat('is_defeat'), ()),
+    BuiltinStub(DataType.VOID, Ident.defeat('truth_is_defeat'), (DataType.BOOL,)),
+    # TODO: I think I want to rename "print" to "write"
+    BuiltinStub(DataType.VOID, Ident('print'), (DataType.STRING,)),
+    BuiltinStub(DataType.VOID, Ident('print'), (ArrayType(DataType.BYTE, const=True),)),
+    BuiltinStub(DataType.VOID, Ident('print'), (DataType.INT,)),
+    BuiltinStub(DataType.VOID, Ident('print'), (DataType.BYTE,)),
+    BuiltinStub(DataType.VOID, Ident('print'), (DataType.BOOL,)),
+    BuiltinStub(DataType.VOID, Ident('println'), (DataType.STRING,)),
+    BuiltinStub(DataType.VOID, Ident('println'), (ArrayType(DataType.BYTE, const=True),)),
+    BuiltinStub(DataType.VOID, Ident('println'), (DataType.INT,)),
+    BuiltinStub(DataType.VOID, Ident('println'), (DataType.BYTE,)),
+    BuiltinStub(DataType.VOID, Ident('println'), (DataType.BOOL,)),
+    BuiltinStub(DataType.VOID, Ident('println'), ()),
+    BuiltinStub(DataType.VOID, Ident('all_is_win'), ()),
+    BuiltinStub(DataType.VOID, Ident('all_is_broken'), ())
+    # TODO: also sleep and debug?  (level_is_debug?)
+)
 
-# sig = self.signature
-#         if prev_decl := env.vars.get(sig):
-#             # Allow re-evaluation if necessary
-#             if prev_decl is self:
-#                 return self
-#
-#             raise TypeCheckError(f'Redefinition of function {self.name}', self.span)
+
+def typecheck(prog, **options):
+    env = Environment(VarTable(), {}, options)
+    env.add_funcs(builtin_stubs)
+    return prog.evaluate(env)
 
 
 @dc.dataclass(frozen=True)
 class Program:
-    var_decls: Sequence[Declaration]
-    func_decls: Sequence[FuncDeclaration]
+    var_decls: tuple[Declaration, ...]
+    func_decls: tuple[FuncDeclaration, ...]
 
-    def checked(self, options=None):
-        if options is None:
-            options = {}
-
-        unevaluated_funcs = dict(builtin_funcs)
-        for func in self.func_decls:
-            sig = func.signature
-            if prev_decl := unevaluated_funcs.get(sig):
-                raise TypeCheckError(
-                    f'Redefinition of function {sig}',
-                    (prev_decl.span, func.span)
-                )
-            unevaluated_funcs[sig] = func
-
-        env = Environment(VarTable(), unevaluated_funcs, options)
+    def evaluate(self, env):
+        env.add_funcs(self.func_decls)
         new_decls = [decl.evaluate(env) for decl in self.var_decls]
         new_funcs = [func.evaluate(env) for func in self.func_decls]
-        return Program(new_decls, new_funcs)
+        return Program(tuple(new_decls), tuple(new_funcs))
