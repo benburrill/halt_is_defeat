@@ -179,12 +179,6 @@ class CodeGen:
     argv_specs: list[bytes]                                    = dc.field(init=False, default_factory=list)
     entry_args: list[asm.Directive]                            = dc.field(init=False, default_factory=list)
 
-    # TODO: I want to keep track of maximum static size (offset + static
-    #  array size) seen for various checkpoints.
-    #  Current thought is to have special mutable AssemblyExpression and
-    #  maintain a sorted list with bisect.
-    #  Removal seems it would be slightly awkward though.
-
     ap = asm.LabelRef('ap')
     fp = asm.LabelRef('fp')
     r0 = asm.LabelRef('r0')
@@ -629,13 +623,8 @@ class CodeGen:
         # will be treated as non-volatile, otherwise copied to stack.
         result: asm.AssemblyExpression = asm.State(r_out)
         match expr:
-            # TODO: change this to set is_byte if the expression was
-            #  originally a character literal, not if it is a ByteValue
-            #  or IntValue.
-            case ast.ByteValue():
-                result = asm.IntLiteral(expr.data, is_byte=True)
             case ast.IntValue():
-                result = asm.IntLiteral(expr.data)
+                result = asm.IntLiteral(expr.data, is_char=expr.is_char)
             case ast.BoolValue():
                 result = asm.IntLiteral(int(expr.data))
             case ast.StringValue():
@@ -856,7 +845,7 @@ class CodeGen:
                     assert isinstance(self.env.funcs[ast.Ident('print')][abstract_params], ast.BuiltinStub)
                     result = yield from self.eval_func_call(DataType.VOID, ast.Ident('print'), args)
                     yield from self.pop(result)
-                yield asm.Yield(asm.IntLiteral(ord('\n'), is_byte=True))
+                yield asm.Yield(asm.IntLiteral(ord('\n'), is_char=True))
                 return self.reserve_type(DataType.VOID)
             elif name == ast.Ident.defeat('is_defeat'):
                 assert not args

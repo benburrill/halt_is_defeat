@@ -102,15 +102,15 @@ class LabelRef(Immediate):
 @dc.dataclass(frozen=True)
 class IntLiteral(Immediate):
     data: int
-    is_byte: bool = dc.field(default=False, compare=False)
+    is_char: bool = dc.field(default=False, compare=False)
 
     def __bytes__(self):
-        if self.is_byte and 0 <= self.data <= 255:
+        if self.is_char and 0 <= self.data <= 255:
             return b"'" + _escape_bytes(bytes([self.data]), b"'") + b"'"
         return str(self.data).encode('utf-8')
 
     def access_byte(self):
-        return IntLiteral(self.data & 0xFF, self.is_byte)
+        return IntLiteral(self.data & 0xFF, self.is_char)
 
 @dc.dataclass
 class DynamicValue(Immediate):

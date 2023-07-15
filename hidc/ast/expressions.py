@@ -303,6 +303,7 @@ class IntValue(PrimitiveValue):
     type = DataType.INT
     data: int
     literal: bool = True
+    is_char: bool = dc.field(default=False, compare=False)
 
     def cast(self, new_type, *, implicit=False):
         if new_type == DataType.BOOL:
@@ -316,9 +317,9 @@ class IntValue(PrimitiveValue):
             #  For that matter I should probably also track word size in
             #  env and use it when evaluating IntValues to do a (signed)
             #  wraparound.
-            return ByteValue(self.data, self.span, implicit and self.literal)
+            return ByteValue(self.data, self.span, implicit and self.literal, self.is_char)
         elif new_type == DataType.INT:
-            return IntValue(self.data, self.span, implicit and self.literal)
+            return IntValue(self.data, self.span, implicit and self.literal, self.is_char)
         return super().cast(new_type)
 
     def coercible(self, new_type):
@@ -343,7 +344,7 @@ class IntValue(PrimitiveValue):
     # Substitution makes IntValues no longer be literal and instead act
     # like normal ints in type coercion.
     def at(self, span):
-        return type(self)(self.data, span, literal=False)
+        return type(self)(self.data, span, literal=False, is_char=self.is_char)
 
 
 class ByteValue(IntValue):

@@ -102,7 +102,7 @@ async def ps_expr0(ctx):
     elif lit := await Instance(IntToken):
         return IntValue(lit.token.data, lit.span)
     elif lit := await Instance(CharToken):
-        return ByteValue(lit.token.data, lit.span)
+        return ByteValue(lit.token.data, lit.span, is_char=True)
     elif lit := await Instance(StringToken):
         return StringValue(lit.token.data, lit.span)
     elif lit := await Instance(BoolToken):
