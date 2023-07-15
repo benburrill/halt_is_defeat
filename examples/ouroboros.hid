@@ -23,7 +23,7 @@
 // make a contradictory version either.
 
 
-void @is_you() {
+empty @is_you() {
     try {
         writeln("preempt block will not run");
         while (true) {

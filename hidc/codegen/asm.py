@@ -210,10 +210,10 @@ class IndirectByte(Accessor):
     def set(self, source: 'AssemblyExpression'):
         yield self.section.sbo(self.base, self.offset, source)
 
-class VoidAccessor(Accessor):
+class EmptyAccessor(Accessor):
     def get(self, r_out: 'LabelRef') -> InstrGen['AssemblyExpression']:
         yield from ()
-        raise InternalCompilerError('Value was void')
+        raise InternalCompilerError('Value was empty')
 
 
 class Directive(ABC):

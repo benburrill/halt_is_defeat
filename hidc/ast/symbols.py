@@ -32,7 +32,7 @@ class Variable:
 @dc.dataclass(frozen=True)
 class UnresolvedName:
     name: str
-    type = DataType.VOID
+    type = DataType.EMPTY
     const = True
 
 

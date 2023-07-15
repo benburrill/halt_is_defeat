@@ -159,7 +159,7 @@ def test_try():
         ), _),
         UndoBlock(_, CodeBlock.empty(_))
     ) == parse_string("""
-        void @f() {
+        empty @f() {
             try { preempt {} } undo {}
         }
     """, ps_program()).func_decls[0].body.stmts[0]
@@ -174,37 +174,37 @@ def test_try():
 
 def test_out_of_place():
     with raises(ParserError): parse_string("""
-        void f() {
+        empty f() {
             try { preempt {} } undo {}
         }
     """, ps_program())
 
     with raises(ParserError): parse_string("""
-        void !f() {
+        empty !f() {
             try { preempt {} } undo {}
         }
     """, ps_program())
 
     with raises(ParserError): parse_string("""
-        void @f() {
+        empty @f() {
             try { try {} undo {} } undo {}
         }
     """, ps_program())
 
     with raises(ParserError): parse_string("""
-        void @f() {
+        empty @f() {
             preempt {}
         }
     """, ps_program())
 
     with raises(ParserError): parse_string("""
-        void f() {
+        empty f() {
             break;
         }
     """, ps_program())
 
     with raises(ParserError): parse_string("""
-        void f() {
+        empty f() {
             continue;
         }
     """, ps_program())
@@ -378,14 +378,14 @@ def test_program():
 
     assert parse_string("""
         int x = -5;
-        void @is_you() {}
+        empty @is_you() {}
     """, ps_program()) == Program(
         var_decls=(Declaration(
             Variable('x', DataType.INT, const=False),
             Neg(_, IntValue(5, _)), _
         ),),
         func_decls=(FuncDeclaration(
-            _, DataType.VOID, Ident.you('is_you'), (),
+            _, DataType.EMPTY, Ident.you('is_you'), (),
             CodeBlock.empty(_)
         ),)
     )
@@ -399,7 +399,7 @@ def test_hash_eq():
         const byte[] arr = ['a', 'b', 'c'];
         int x[42];
         
-        void @is_you() {
+        empty @is_you() {
             x[0] = -arr[arr.length - 1] + 1;
             try {
                 for (int i = 0; i < arr.length; i += 1) {

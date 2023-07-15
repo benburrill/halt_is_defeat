@@ -18,22 +18,22 @@ halt = asm.LabelRef('halt')
 # The stdlib also expects registers r0, r1, r2, and fp
 # I may consider moving them + their state definitions here.
 stdlib_funcs = {
-    # void all_is_win()
+    # empty all_is_win()
     ConcreteSignature(Ident('all_is_win'), ()): all_is_win,
-    # void all_is_broken()
+    # empty all_is_broken()
     ConcreteSignature(Ident('all_is_broken'), ()): all_is_broken,
-    # void write(const byte[] s)
+    # empty write(const byte[] s)
     ConcreteSignature(Ident('write'), (
         ConcreteArrayType(DataType.BYTE, AccessMode.RC),
     )): asm.LabelRef('write_const_byte_array'),
     ConcreteSignature(Ident('write'), (
         ConcreteArrayType(DataType.BYTE, AccessMode.R),
     )): asm.LabelRef('write_state_byte_array'),
-    # void write(string s)
+    # empty write(string s)
     ConcreteSignature(Ident('write'), (DataType.STRING,)): asm.LabelRef('write_string'),
-    # void write(bool b)
+    # empty write(bool b)
     ConcreteSignature(Ident('write'), (DataType.BOOL,)): asm.LabelRef('write_bool'),
-    # void write(int i)
+    # empty write(int i)
     ConcreteSignature(Ident('write'), (DataType.INT,)): asm.LabelRef('write_int')
 }
 

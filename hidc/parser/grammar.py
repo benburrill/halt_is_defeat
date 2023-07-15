@@ -8,7 +8,7 @@ from functools import cached_property
 
 
 async def ps_data_type():
-    if (tp := await Instance(DataType)) and tp.token != DataType.VOID:
+    if (tp := await Instance(DataType)) and tp.token != DataType.EMPTY:
         return tp.token
 
 

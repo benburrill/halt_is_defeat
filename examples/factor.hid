@@ -54,7 +54,7 @@ bool @write_factors(int n) {
 }
 
 
-void @show_factors(int n) {
+empty @show_factors(int n) {
     write("Factorization of ");
     write(n);
     write(": ");
@@ -65,7 +65,7 @@ void @show_factors(int n) {
 }
 
 
-void @is_you(int[] nums) {
+empty @is_you(int[] nums) {
     if (nums) {
         for (int i = 0; i < nums.length; i += 1) {
             @show_factors(nums[i]);

@@ -35,14 +35,16 @@ it should not be relied on for performance-critical applications.
 
 Hello world
 -----------
-The entry point to Halt is Defeat programs is ``@is_you()``.
-There are 3 kinds of function in Halt is Defeat, ``@is_you()`` being a
+The entry point to Halt is Defeat programs is ``@is_you()``.  The return
+type must be ``empty``, and parameters specified by ``@is_you`` may be
+passed in as command-line arguments to ``spasm`` (more on this later).
+There are 3 kinds of function in Halt is Defeat, ``@is_you`` being a
 "you" function.  You can tell because the name starts with an ``@``, but
 for now you may ignore this distinction.  Here's a simple program:
 
 .. code::
 
-    void @is_you() {
+    empty @is_you() {
         writeln("Hello world!");
         write("Some numbers:");
         for (int i = 1; i <= 10; i += 1) {
@@ -80,7 +82,6 @@ may destroy the universe.
 
 A taste of defeat
 -----------------
-
 Defeat functions have names starting with ``!``, and may result in
 defeat if called.  ``!is_defeat()`` always results in defeat.  Defeat
 functions cannot be called directly from within you functions, but you
@@ -94,7 +95,7 @@ and the ``stop`` block is run:
 
 .. code::
 
-    void @is_you() {
+    empty @is_you() {
         try {
             writeln("try block");
             !is_defeat();
@@ -136,7 +137,7 @@ defeat:
 
 .. code::
 
-    void @is_you() {
+    empty @is_you() {
         try {
             writeln("try block");
             !is_defeat();
@@ -166,7 +167,7 @@ occur if the loop runs forever:
 
 .. code::
 
-    void @is_you() {
+    empty @is_you() {
         try {
             writeln("The loop runs forever");
             while (true) {}
@@ -217,16 +218,16 @@ Halt is Defeat makes use of Sphinx's robust argument specifiers, which I
 added to Sphinx mostly so that Halt is Defeat could make use of them.
 
 If you want command-line arguments, you can write your ``@is_you``
-function with the signature ``void @is_you(const string[] args)``
+function with the signature ``empty @is_you(const string[] args)``
 
 Does your program take integers as input?  Don't want to write code to
 parse them?  Don't worry!  You can get ``spasm`` to do it for you!
-The signature ``void @is_you(const int[] args)`` specifies that the
+The signature ``empty @is_you(const int[] args)`` specifies that the
 inputs should be integers, which ``spasm`` will be parse (in base 10)
 from the command line arguments.
 
 You can even mix and match:
-``void @is_you(string mode, const int[] args)``
+``empty @is_you(string mode, const int[] args)``
 
 In addition to convenience, an advantage to this is that the cycle count
 reported by ``spasm`` won't get artificially inflated by parsing code,
@@ -245,7 +246,7 @@ Caveats:
 
 .. code::
 
-    void @is_you(const string[] args) {
+    empty @is_you(const string[] args) {
         string mutargs[args.length];
         for (int i = 0; i < args.length; i += 1) {
             mutargs[i] = args[i];

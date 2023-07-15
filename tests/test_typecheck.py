@@ -73,7 +73,7 @@ def test_exit():
     """)
 
     assert_good("""
-        void f(int x) {
+        empty f(int x) {
             if (x < 10) {
                 return;
             }
@@ -83,104 +83,104 @@ def test_exit():
 
 def test_const_arrays():
     assert_good("""
-        void f(const int[] x) {}
-        void g(int[] x) {
+        empty f(const int[] x) {}
+        empty g(int[] x) {
             f(x);
         }
     """)
 
     assert_bad("""
-        void f(int[] x) {}
-        void g(const int[] x) {
+        empty f(int[] x) {}
+        empty g(const int[] x) {
             f(x);
         }
     """)
 
     assert_good("""
-        void f() {
+        empty f() {
             const int[] x = [1, 2, 3];
             const int[] y = x;
         }
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             const int[] x = [1, 2, 3];
             int[] y = x;
         }
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             int[] x = [1, 2, 3];
             const int[] y = x;
         }
     """)
 
     assert_good("""
-        void f() {
+        empty f() {
             int x[10];
         }
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             const int x[10];
         }
     """)
 
 def test_coercion():
     assert_good("""
-        void f() {
+        empty f() {
             int x = 'a';
             byte y = 10;
         }
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             int x = true;
             bool y = 10;
         }
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             int x = 10;
             byte y = x;
         }
     """)
 
     assert_good("""
-        void f() {
+        empty f() {
             int[] x = [1, 'a'];
             byte[] y = [1, 'a'];
         }
     """)
 
     assert_good("""
-        void f() {
+        empty f() {
             byte x = 1;
             int[] y = [x, 1];
         }
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             int x = 1;
             byte[] y = [x, 'a'];
         }
     """)
 
     assert_good("""
-        void f() {
+        empty f() {
             byte x = 0;
             x += 1;
         }
     """)
 
     assert_good("""
-        void f() {
+        empty f() {
             byte x = 0;
             byte y = x * 3 + 2;
         }
@@ -189,7 +189,7 @@ def test_coercion():
 
 def test_cast():
     assert_good("""
-        void f() {
+        empty f() {
             int x = true is int;
             bool y = 10 is bool;
         }
@@ -198,13 +198,13 @@ def test_cast():
 
 def test_bad_array():
     assert_good("""
-        void f() {
+        empty f() {
             [1, 2];
         }
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             [[1], [2]];
         }
     """)
@@ -212,21 +212,21 @@ def test_bad_array():
 
 def test_unreachable():
     assert_good("""
-        void f() {
+        empty f() {
             return;
             write("hi");
         }
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             return;
             write("hi");
         }
     """, unreachable_error=True)
 
     assert_good("""
-        void f() {
+        empty f() {
             write("hi");
             return;
         }
@@ -234,7 +234,7 @@ def test_unreachable():
 
 
     assert_good("""
-        void @f(int x) {
+        empty @f(int x) {
             while (true) {
                 try {
                     if (x < 10) {
@@ -250,7 +250,7 @@ def test_unreachable():
     """, unreachable_error=True)
 
     assert_bad("""
-        void @f(int x) {
+        empty @f(int x) {
             while (true) {
                 try {
                     if (x < 10) {
@@ -267,7 +267,7 @@ def test_unreachable():
     """, unreachable_error=True)
 
     assert_good("""
-        void @f(int x) {
+        empty @f(int x) {
             while (true) {
                 try {
                     if (x < 10) {
@@ -285,7 +285,7 @@ def test_unreachable():
 
 def test_operators():
     assert_good("""
-        void f(int x, byte y) {
+        empty f(int x, byte y) {
             int a = 2 + 3;
             int b = 2 + y;
             int c = x + y;
@@ -305,20 +305,20 @@ def test_shadowing():
     assert_good("""
         int x = 3;
         int y = 10;
-        void f(int x) {
+        empty f(int x) {
             int y = 8;
         }
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             int x = 3;
             int x = 8;
         }
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             int x = 3;
             if (true) {
                 int x = 8;
@@ -327,18 +327,18 @@ def test_shadowing():
     """)
 
     assert_bad("""
-        void f(int x) {
+        empty f(int x) {
             int x = 3;
         }
     """)
 
     assert_bad("""
-        void f(int x, int x) {}
+        empty f(int x, int x) {}
     """)
 
 def test_loop():
     assert_good("""
-        void f() {
+        empty f() {
             for (int i = 0; i < 10; i += 1) {
                 write(i);
             }
@@ -440,7 +440,7 @@ def test_try():
 
 def test_lookups():
     assert_good("""
-        void f() {
+        empty f() {
             int x[10];
             x.length;
             int l = x.length;
@@ -450,28 +450,28 @@ def test_lookups():
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             int x = 0;
             x.length;
         }
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             int x = 0;
             x[0];
         }
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             int x[10];
             x["hi"];
         }
     """)
 
     assert_good("""
-        void f() {
+        empty f() {
             string x = "hello";
             int l = x.length;
             byte x0 = x[0];
@@ -481,8 +481,8 @@ def test_lookups():
 
 def test_func_calls():
     assert_good("""
-        void f(const int[] x) {}
-        void g() {
+        empty f(const int[] x) {}
+        empty g() {
             f([]);
         }
     """)
@@ -491,7 +491,7 @@ def test_func_calls():
     assert_good("""
         int f(const int[] x) {return 0;}
         string f(const string[] x) {return "";}
-        void g() {
+        empty g() {
             int x = f([]);
         }
     """)
@@ -499,7 +499,7 @@ def test_func_calls():
     assert_bad("""
         string f(const string[] x) {return "";}
         int f(const int[] x) {return 0;}
-        void g() {
+        empty g() {
             int x = f([]);
         }
     """)
@@ -508,7 +508,7 @@ def test_func_calls():
     assert_good("""
         int f(const int[] x) {return 0;}
         byte f(const byte[] x) {return 0;}
-        void g() {
+        empty g() {
             byte x = f(['a']);
         }
     """)
@@ -526,7 +526,7 @@ def test_func_calls():
     assert_bad("""
         int f(int[] x) {return 0;}
         byte f(byte[] x) {return 0;}
-        void g() {
+        empty g() {
             byte x = f(['a']);
         }
     """)
@@ -534,7 +534,7 @@ def test_func_calls():
     assert_good("""
         int f(int[] x) {return 0;}
         byte f(byte[] x) {return 0;}
-        void g() {
+        empty g() {
             int x = f(['a']);
         }
     """)
@@ -543,7 +543,7 @@ def test_func_calls():
     assert_good("""
         int f(int[] x) {return 0;}
         byte f(byte[] x) {return 0;}
-        void g() {
+        empty g() {
             byte x = f(['a'] is byte[]);
         }
     """)
@@ -551,13 +551,13 @@ def test_func_calls():
 
 def test_undeclared():
     assert_bad("""
-        void f() {
+        empty f() {
             write(x);
         }
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             g();
         }
     """)
@@ -569,7 +569,7 @@ def test_redecl():
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             int x = 10;
             int x = 5;
         }
@@ -577,14 +577,14 @@ def test_redecl():
 
     assert_good("""
         int x = 10;
-        void f() {
+        empty f() {
             // Shadowing of globals allowed
             int x = 5;
         }
     """)
 
     assert_bad("""
-        void f() {
+        empty f() {
             int x = 10;
             if (true) {
                 // Shadowing of locals not allowed
@@ -594,15 +594,15 @@ def test_redecl():
     """)
 
     assert_good("""
-        void f(int x) {}
-        void f(byte x) {}
+        empty f(int x) {}
+        empty f(byte x) {}
     """)
 
     assert_bad("""
-        void f(int x) {}
-        void f(int x) {}
+        empty f(int x) {}
+        empty f(int x) {}
     """)
 
     assert_bad("""
-        void writeln(int x) {}
+        empty writeln(int x) {}
     """)

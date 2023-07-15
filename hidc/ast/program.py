@@ -51,7 +51,7 @@ class FuncDeclaration(FuncDefinition):
         assert ExitMode.BREAK not in exit_modes
         assert ExitMode.DEFEAT not in exit_modes or self.name.flavor == Flavor.DEFEAT
         if ExitMode.NONE in exit_modes:
-            if self.ret_type != DataType.VOID:
+            if self.ret_type != DataType.EMPTY:
                 raise TypeCheckError('Missing return statement', self.body.span)
             body = CodeBlock(
                 body.stmts + (ReturnStatement(body.span.end),),
@@ -69,23 +69,23 @@ class FuncDeclaration(FuncDefinition):
 
 
 builtin_stubs = (
-    BuiltinStub(DataType.VOID, Ident.defeat('is_defeat'), ()),
-    BuiltinStub(DataType.VOID, Ident.defeat('truth_is_defeat'), (DataType.BOOL,)),
-    BuiltinStub(DataType.VOID, Ident('write'), (DataType.STRING,)),
-    BuiltinStub(DataType.VOID, Ident('write'), (ArrayType(DataType.BYTE, const=True),)),
-    BuiltinStub(DataType.VOID, Ident('write'), (DataType.INT,)),
-    BuiltinStub(DataType.VOID, Ident('write'), (DataType.BYTE,)),
-    BuiltinStub(DataType.VOID, Ident('write'), (DataType.BOOL,)),
-    BuiltinStub(DataType.VOID, Ident('writeln'), (DataType.STRING,)),
-    BuiltinStub(DataType.VOID, Ident('writeln'), (ArrayType(DataType.BYTE, const=True),)),
-    BuiltinStub(DataType.VOID, Ident('writeln'), (DataType.INT,)),
-    BuiltinStub(DataType.VOID, Ident('writeln'), (DataType.BYTE,)),
-    BuiltinStub(DataType.VOID, Ident('writeln'), (DataType.BOOL,)),
-    BuiltinStub(DataType.VOID, Ident('writeln'), ()),
-    BuiltinStub(DataType.VOID, Ident('all_is_win'), ()),
-    BuiltinStub(DataType.VOID, Ident('all_is_broken'), ()),
-    BuiltinStub(DataType.VOID, Ident('sleep'), (DataType.INT,)),
-    BuiltinStub(DataType.VOID, Ident('debug'), ())
+    BuiltinStub(DataType.EMPTY, Ident.defeat('is_defeat'), ()),
+    BuiltinStub(DataType.EMPTY, Ident.defeat('truth_is_defeat'), (DataType.BOOL,)),
+    BuiltinStub(DataType.EMPTY, Ident('write'), (DataType.STRING,)),
+    BuiltinStub(DataType.EMPTY, Ident('write'), (ArrayType(DataType.BYTE, const=True),)),
+    BuiltinStub(DataType.EMPTY, Ident('write'), (DataType.INT,)),
+    BuiltinStub(DataType.EMPTY, Ident('write'), (DataType.BYTE,)),
+    BuiltinStub(DataType.EMPTY, Ident('write'), (DataType.BOOL,)),
+    BuiltinStub(DataType.EMPTY, Ident('writeln'), (DataType.STRING,)),
+    BuiltinStub(DataType.EMPTY, Ident('writeln'), (ArrayType(DataType.BYTE, const=True),)),
+    BuiltinStub(DataType.EMPTY, Ident('writeln'), (DataType.INT,)),
+    BuiltinStub(DataType.EMPTY, Ident('writeln'), (DataType.BYTE,)),
+    BuiltinStub(DataType.EMPTY, Ident('writeln'), (DataType.BOOL,)),
+    BuiltinStub(DataType.EMPTY, Ident('writeln'), ()),
+    BuiltinStub(DataType.EMPTY, Ident('all_is_win'), ()),
+    BuiltinStub(DataType.EMPTY, Ident('all_is_broken'), ()),
+    BuiltinStub(DataType.EMPTY, Ident('sleep'), (DataType.INT,)),
+    BuiltinStub(DataType.EMPTY, Ident('debug'), ())
 )
 
 

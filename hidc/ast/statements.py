@@ -102,9 +102,9 @@ class ReturnStatement(abc.Statement):
             raise TypeCheckError('Unexpected return statement', self.span)
 
         if self.value is not None:
-            if env.return_type == DataType.VOID:
+            if env.return_type == DataType.EMPTY:
                 raise TypeCheckError(
-                    'Unexpected value after return in void function',
+                    'Unexpected return value in function returning empty',
                     self.value.span
                 )
 
@@ -112,7 +112,7 @@ class ReturnStatement(abc.Statement):
                 self.span,
                 self.value.evaluate(env).coerce(env.return_type)
             )
-        elif env.return_type != DataType.VOID:
+        elif env.return_type != DataType.EMPTY:
             raise TypeCheckError('Missing return value', self.span)
 
         return self

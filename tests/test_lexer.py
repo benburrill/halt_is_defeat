@@ -89,13 +89,13 @@ def test_lex_symbol():
 
 def test_large():
     assert lex_string('''
-        void @is_you() {
+        empty @is_you() {
             if (true) {
                 writeln("Hello world!");
             }
         }
     ''') == [
-        DataType.VOID, Ident.you('is_you'),
+        DataType.EMPTY, Ident.you('is_you'),
         BracToken.LPAREN, BracToken.RPAREN, BracToken.LCURLY,
             BlockToken.IF, BracToken.LPAREN, BoolToken.TRUE, BracToken.RPAREN, BracToken.LCURLY,
                 Ident('writeln'), BracToken.LPAREN,
@@ -117,7 +117,7 @@ def test_tokens():
 
 def test_hash_eq():
     test = '''
-    "a" 97 'a' a @a !a + += break ; if ( true ) { } void
+    "a" 97 'a' a @a !a + += break ; if ( true ) { } empty
     '''
     assert set(lex_string(test)) == set(lex_string(test))
     assert len(set(lex_string(test))) == len(test.strip().split())

@@ -191,11 +191,11 @@ class ArrayLookup(Assignable):
         if isinstance(source, ArrayLiteral):
             # TODO: maybe make this a method of ArrayLiteral, but I'm
             #  pretty sure this is the only place where this is needed.
-            if source.type.el_type == DataType.VOID:
+            if source.type.el_type == DataType.EMPTY:
                 raise TypeCheckError('Array type is ambiguous', source.span)
             source = source.coerce(source.type)  # coerce elements
         elif isinstance(source.type, ArrayType):
-            assert source.type.el_type != DataType.VOID
+            assert source.type.el_type != DataType.EMPTY
 
         return ArrayLookup(
             source, self.index.evaluate(env).coerce(DataType.INT),
@@ -238,7 +238,7 @@ class FuncCall(Expression):
     func: Ident
     args: Sequence[Expression]
     span: Span
-    type: Type = DataType.VOID
+    type: Type = DataType.EMPTY
 
     def evaluate(self, env):
         args = tuple(arg.evaluate(env) for arg in self.args)
@@ -379,7 +379,7 @@ class StringValue(PrimitiveValue):
 class ArrayLiteral(Expression):
     values: Sequence[Expression]
     span: Span
-    type: Type = ArrayType(DataType.VOID, const=True)
+    type: Type = ArrayType(DataType.EMPTY, const=True)
     type_locked: bool = False
 
     def coercible(self, new_type):

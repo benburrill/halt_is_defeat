@@ -160,7 +160,7 @@ class DataType(EnumToken):
     BOOL = 'bool'
     BYTE = 'byte'
     STRING = 'string'
-    VOID = 'void'
+    EMPTY = 'empty'
 
     @property
     def byte_sized(self):

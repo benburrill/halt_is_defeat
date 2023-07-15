@@ -41,7 +41,7 @@ bool test_rules(const int[] rules, const bool[] vals) {
 }
 
 
-void @is_you() {
+empty @is_you() {
     bool result[3];
     bool satisfiable = @satisfy([
         1, 2, 3, 0,     // ((X1 | X2 | X3) &

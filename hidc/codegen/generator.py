@@ -204,6 +204,9 @@ class CodeGen:
             ))
 
         is_you_decl, = is_you.values()
+        if is_you_decl.ret_type != DataType.EMPTY:
+            raise CodeGenError('Entry point @is_you(...) must return empty', is_you_decl.span)
+
         has_array = False
         self.argv_specs = []
         self.entry_args = []
@@ -838,33 +841,33 @@ class CodeGen:
             if name == ast.Ident('write') and abstract_params == (DataType.BYTE,):
                 val = yield from self.get_expr_value(self.r1, args[0])
                 yield asm.Yield(val)
-                return self.reserve_type(DataType.VOID)
+                return self.reserve_type(DataType.EMPTY)
             elif name == ast.Ident('writeln'):
                 if len(args) != 0:
                     assert isinstance(self.env.funcs[ast.Ident('write')][abstract_params], ast.BuiltinStub)
-                    result = yield from self.eval_func_call(DataType.VOID, ast.Ident('write'), args)
+                    result = yield from self.eval_func_call(DataType.EMPTY, ast.Ident('write'), args)
                     yield from self.pop(result)
                 yield asm.Yield(asm.IntLiteral(ord('\n'), is_char=True))
-                return self.reserve_type(DataType.VOID)
+                return self.reserve_type(DataType.EMPTY)
             elif name == ast.Ident.defeat('is_defeat'):
                 assert not args
                 if self.effective_defeat != stdlib.halt:
                     yield asm.Jump(self.effective_defeat)
                 yield asm.Halt()
-                return self.reserve_type(DataType.VOID)
+                return self.reserve_type(DataType.EMPTY)
             elif name == ast.Ident.defeat('truth_is_defeat'):
                 arg, = args
                 yield from self.truth_is_defeat(arg)
-                return self.reserve_type(DataType.VOID)
+                return self.reserve_type(DataType.EMPTY)
             elif name == ast.Ident('sleep'):
                 arg, = args
                 val = yield from self.get_expr_value(self.r1, arg)
                 yield asm.Sleep(val)
-                return self.reserve_type(DataType.VOID)
+                return self.reserve_type(DataType.EMPTY)
             elif name == ast.Ident('debug'):
                 assert not args
                 yield asm.Flag(asm.SpecialArg(b'debug'))
-                return self.reserve_type(DataType.VOID)
+                return self.reserve_type(DataType.EMPTY)
             elif abstract_params not in stdlib.abstract_funcs.get(name, set()):
                 raise InternalCompilerError(f'Unimplemented stdlib function: {name}, {abstract_params}')
 
@@ -1391,8 +1394,8 @@ class CodeGen:
         assert isinstance(val_type, DataType)
         if val_type.byte_sized:
             return self.reserve_byte()
-        if val_type == DataType.VOID:
-            return self.vacpack(asm.VoidAccessor())
+        if val_type == DataType.EMPTY:
+            return self.vacpack(asm.EmptyAccessor())
         return self.reserve_word()
 
     def array_size(self, data_type, length):
@@ -1435,7 +1438,7 @@ class CodeGen:
         assert isinstance(val_type, DataType)
         if val_type.byte_sized:
             return 1
-        if val_type == DataType.VOID:
+        if val_type == DataType.EMPTY:
             return 0
         return self.word_size
 

@@ -1,4 +1,4 @@
-void @is_you() {
+empty @is_you() {
     writeln("Hello world!");
     write("Some numbers:");
     for (int i = 1; i <= 10; i += 1) {

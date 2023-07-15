@@ -4,7 +4,7 @@
 // https://github.com/benburrill/sphinx/blob/main/examples/sphinxfuck.s
 // for more details.
 
-void @sphinxfuck(string src, byte[] mem, const byte[] input) {
+empty @sphinxfuck(string src, byte[] mem, const byte[] input) {
     // For reporting number of steps taken, like spasm's cycle count.
     // NOTE: there's a good reason why steps is byte rather than int!
     // Under emulation, spasm won't detect a loop until the sphinxfuck
@@ -87,7 +87,7 @@ int match(byte open, byte close, string s, int idx, int dir) {
 // A nice big buffer for sphinxfuck if needed
 byte buf[1000];
 
-void @is_you(byte[] args) {
+empty @is_you(byte[] args) {
     byte input_num = 13;
     if (args) {
         input_num = args[0];
