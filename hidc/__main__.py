@@ -66,14 +66,10 @@ def main():
             pprint(ast)
             return 0
 
-        # TODO: actually we'd rather not create the file until the we
-        #  have compiled all functions and are ready to generate code.
-        #  Otherwise compilation failure still produces a file -_-
-        #  But currently generate calls make_funcs
         output = args.output if args.output is not None else args.input + '.s'
+        code_gen = CodeGen(env, args.word_size // 8, args.stack_size, args.unchecked)
         with open(output, 'wb') as f:
-            code_gen = CodeGen(env, args.word_size // 8, args.stack_size, args.unchecked)
-            for line in code_gen.generate():
+            for line in code_gen.gen_lines():
                 f.write(line)
                 f.write(b'\n')
 

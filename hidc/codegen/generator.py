@@ -275,9 +275,9 @@ class CodeGen:
 
         self.func_labels.update(stdlib.stdlib_funcs)
         self.label_for_func(ConcreteSignature(ast.Ident.you('is_you'), tuple(concrete_types)))
-
-    def generate(self):
         self.make_funcs()
+
+    def gen_lines(self):
         if self.argv_specs:
             yield b'%argv ' + b' '.join(self.argv_specs)
         yield b'%format word ' + str(self.word_size).encode('utf-8')
