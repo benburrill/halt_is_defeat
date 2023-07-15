@@ -83,8 +83,9 @@ builtin_stubs = (
     BuiltinStub(DataType.VOID, Ident('writeln'), (DataType.BOOL,)),
     BuiltinStub(DataType.VOID, Ident('writeln'), ()),
     BuiltinStub(DataType.VOID, Ident('all_is_win'), ()),
-    BuiltinStub(DataType.VOID, Ident('all_is_broken'), ())
-    # TODO: also sleep and debug?  (level_is_debug?)
+    BuiltinStub(DataType.VOID, Ident('all_is_broken'), ()),
+    BuiltinStub(DataType.VOID, Ident('sleep'), (DataType.INT,)),
+    BuiltinStub(DataType.VOID, Ident('debug'), ())
 )
 
 

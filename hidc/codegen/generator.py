@@ -856,6 +856,15 @@ class CodeGen:
                 arg, = args
                 yield from self.truth_is_defeat(arg)
                 return self.reserve_type(DataType.VOID)
+            elif name == ast.Ident('sleep'):
+                arg, = args
+                val = yield from self.get_expr_value(self.r1, arg)
+                yield asm.Sleep(val)
+                return self.reserve_type(DataType.VOID)
+            elif name == ast.Ident('debug'):
+                assert not args
+                yield asm.Flag(asm.SpecialArg(b'debug'))
+                return self.reserve_type(DataType.VOID)
             elif abstract_params not in stdlib.abstract_funcs.get(name, set()):
                 raise InternalCompilerError(f'Unimplemented stdlib function: {name}, {abstract_params}')
 
