@@ -1,9 +1,9 @@
 void @is_you() {
-    println("Hello world!");
-    print("Some numbers:");
+    writeln("Hello world!");
+    write("Some numbers:");
     for (int i = 1; i <= 10; i += 1) {
-        print(' ');
-        print(i);
+        write(' ');
+        write(i);
     }
-    println();
+    writeln();
 }

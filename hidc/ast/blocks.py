@@ -156,7 +156,7 @@ class UndoBlock(ControlBlock):
 
 
 @dc.dataclass(frozen=True)
-class CatchBlock(ControlBlock):
+class StopBlock(ControlBlock):
     def exit_modes(self):
         return self.body.exit_modes()
 
@@ -170,7 +170,7 @@ class PreemptBlock(ControlBlock):
 
 @dc.dataclass(frozen=True)
 class TryBlock(ControlBlock):
-    handler: UndoBlock | CatchBlock
+    handler: UndoBlock | StopBlock
 
     def evaluate(self, env):
         return TryBlock(

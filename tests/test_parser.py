@@ -287,7 +287,7 @@ def test_for():
 def test_if():
     assert parse_string("""
         if (x == 1 or y == 2) {
-            println("potato");
+            writeln("potato");
         }
     """, ps_block(ctx)) == IfBlock(
         start=_,
@@ -297,7 +297,7 @@ def test_if():
         ),
         body=CodeBlock((
             FuncCall(
-                Ident('println'),
+                Ident('writeln'),
                 (StringValue(b'potato', _),), _
             ),
         ), _),

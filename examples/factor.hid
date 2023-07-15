@@ -14,8 +14,8 @@ int @divide(int n) {
 
     try {
         int result = 0;
-        int stop = n / 2;
-        for (int b = 1; b <= stop; b *= 2) {
+        int half = n / 2;
+        for (int b = 1; b <= half; b *= 2) {
             // Loop through powers of 2, for each one adding it to our
             // result number (setting the bit) if it is necessary.
             preempt {
@@ -38,30 +38,30 @@ int @divide(int n) {
 }
 
 
-bool @print_factors(int n) {
+bool @write_factors(int n) {
     int d = @divide(n);
     if (d == n) {
-        print(d);
+        write(d);
         return true;
     }
 
-    print('(');
-    @print_factors(d);
-    print(" * ");
-    @print_factors(n / d);
-    print(')');
+    write('(');
+    @write_factors(d);
+    write(" * ");
+    @write_factors(n / d);
+    write(')');
     return false;
 }
 
 
 void @show_factors(int n) {
-    print("Factorization of ");
-    print(n);
-    print(": ");
-    if (@print_factors(n)) {
-        print(" -- it's prime!");
+    write("Factorization of ");
+    write(n);
+    write(": ");
+    if (@write_factors(n)) {
+        write(" -- it's prime!");
     }
-    println();
+    writeln();
 }
 
 

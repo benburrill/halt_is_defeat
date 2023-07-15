@@ -150,10 +150,7 @@ class BlockToken(EnumToken):
     FOR = 'for'
     TRY = 'try'
     UNDO = 'undo'
-    # TODO: rename catch to stop?  Though it's such a common programming
-    #  word I've already used it as a variable more than once in my HiD
-    #  programs...
-    CATCH = 'catch'
+    STOP = 'stop'
     PREEMPT = 'preempt'
 
 

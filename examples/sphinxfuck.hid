@@ -29,7 +29,7 @@ void @sphinxfuck(string src, byte[] mem, const byte[] input) {
                 mem[dp] -= 1;
             } else if (cur == '.') {
                 // Output as int rather than byte
-                println(mem[dp] is int);
+                writeln(mem[dp] is int);
             } else if (cur == ',') {
                 if (ip < input.length) {
                     mem[dp] = input[ip];
@@ -50,18 +50,18 @@ void @sphinxfuck(string src, byte[] mem, const byte[] input) {
                     pc = match(']', '(', src, pc, -1);
                 }
             } else if (cur == '@') {
-                println("Reached sphinxfuck @");
-                print("Steps: ");
-                println(steps is int);
+                writeln("Reached sphinxfuck @");
+                write("Steps: ");
+                writeln(steps is int);
             }
 
             pc += 1;
             steps += 1;
         }
-    } catch {
-        println("Sphinxfuck halted");
-        print("Steps: ");
-        println(steps is int);
+    } stop {
+        writeln("Sphinxfuck halted");
+        write("Steps: ");
+        writeln(steps is int);
     }
 }
 

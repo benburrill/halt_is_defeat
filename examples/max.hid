@@ -28,26 +28,26 @@ int @max(const int[] arr) {
     }
 }
 
-void print_array(const int[] arr) {
-    print('[');
+void write_array(const int[] arr) {
+    write('[');
     for (int i = 0; i < arr.length; i += 1) {
         if (i != 0) {
-            print(", ");
+            write(", ");
         }
-        print(arr[i]);
+        write(arr[i]);
     }
-    print(']');
+    write(']');
 }
 
 void @is_you(int[] nums) {
     if (nums) {
-        print("Max value: ");
-        println(@max(nums));
+        write("Max value: ");
+        writeln(@max(nums));
     } else {
-        print("Array: ");
-        print_array(default);
-        println();
-        print("Max value: ");
-        println(@max(default));
+        write("Array: ");
+        write_array(default);
+        writeln();
+        write("Max value: ");
+        writeln(@max(default));
     }
 }

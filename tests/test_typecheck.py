@@ -214,20 +214,20 @@ def test_unreachable():
     assert_good("""
         void f() {
             return;
-            print("hi");
+            write("hi");
         }
     """)
 
     assert_bad("""
         void f() {
             return;
-            print("hi");
+            write("hi");
         }
     """, unreachable_error=True)
 
     assert_good("""
         void f() {
-            print("hi");
+            write("hi");
             return;
         }
     """, unreachable_error=True)
@@ -261,7 +261,7 @@ def test_unreachable():
                 } undo {
                     break;
                 }
-                println("Hello world!");
+                writeln("Hello world!");
             }
         }
     """, unreachable_error=True)
@@ -271,14 +271,14 @@ def test_unreachable():
             while (true) {
                 try {
                     if (x < 10) {
-                        println("Hi");
+                        writeln("Hi");
                     } else {
                         !is_defeat();
                     }
                 } undo {
                     break;
                 }
-                println("Hello world!");
+                writeln("Hello world!");
             }
         }
     """, unreachable_error=True)
@@ -340,7 +340,7 @@ def test_loop():
     assert_good("""
         void f() {
             for (int i = 0; i < 10; i += 1) {
-                print(i);
+                write(i);
             }
             
             int i = 42; // Different scope
@@ -552,7 +552,7 @@ def test_func_calls():
 def test_undeclared():
     assert_bad("""
         void f() {
-            print(x);
+            write(x);
         }
     """)
 
@@ -604,5 +604,5 @@ def test_redecl():
     """)
 
     assert_bad("""
-        void println(int x) {}
+        void writeln(int x) {}
     """)

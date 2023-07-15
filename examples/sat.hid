@@ -52,14 +52,14 @@ void @is_you() {
     ], result);
 
     if (satisfiable) {
-        println("Satisfying solution:");
+        writeln("Satisfying solution:");
         for (int i = 0; i < result.length; i += 1) {
-            print("X");
-            print(i + 1);
-            print(" = ");
-            println(result[i]);
+            write("X");
+            write(i + 1);
+            write(" = ");
+            writeln(result[i]);
         }
     } else {
-        println("Unsatisfiable");
+        writeln("Unsatisfiable");
     }
 }

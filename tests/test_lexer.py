@@ -91,14 +91,14 @@ def test_large():
     assert lex_string('''
         void @is_you() {
             if (true) {
-                println("Hello world!");
+                writeln("Hello world!");
             }
         }
     ''') == [
         DataType.VOID, Ident.you('is_you'),
         BracToken.LPAREN, BracToken.RPAREN, BracToken.LCURLY,
             BlockToken.IF, BracToken.LPAREN, BoolToken.TRUE, BracToken.RPAREN, BracToken.LCURLY,
-                Ident('println'), BracToken.LPAREN,
+                Ident('writeln'), BracToken.LPAREN,
                     StringToken(b'Hello world!'),
                 BracToken.RPAREN, SepToken.SEMICOLON,
             BracToken.RCURLY,

@@ -184,7 +184,7 @@ class CodeGen:
     r0 = asm.LabelRef('r0')
     r1 = asm.LabelRef('r1')
     r2 = asm.LabelRef('r2')
-    cfp = asm.LabelRef('cfp')
+    try_fp = asm.LabelRef('try_fp')
     defeat = asm.LabelRef('defeat')
 
     def __post_init__(self):
@@ -293,7 +293,7 @@ class CodeGen:
             yield from directive.lines()
 
         if self.needs_variable_defeat:
-            yield b'cfp: .word 0'
+            yield b'try_fp: .word 0'
             yield b'defeat: .word halt'
 
         yield b'%section const'
@@ -326,7 +326,7 @@ class CodeGen:
         self.checkpoints = Tracker()
 
         # In defeat functions, we must assume we're being called from
-        # a try/catch block, so use variable defeat.
+        # a try/stop block, so use variable defeat.
         if csig.name.flavor == ast.Flavor.DEFEAT:
             self.func_defeat = asm.State(self.defeat)
             self.needs_variable_defeat = True
@@ -424,7 +424,7 @@ class CodeGen:
                 begin_try = self.add_label('begin_try')
                 end_try = self.add_label('end_try')
                 yield asm.Metadata('try block')
-                if isinstance(block.handler, ast.CatchBlock):
+                if isinstance(block.handler, ast.StopBlock):
                     # prev_defeat should always be stdlib.defeat, but
                     # doing this gives the illusion of flexibility.
                     prev_defeat = self.effective_defeat
@@ -440,7 +440,7 @@ class CodeGen:
                     # it, and obviously we can't keep it on the stack --
                     # it needs its own special-purpose global variable.
                     # Thankfully try cannot be nested.
-                    yield asm.Mov(self.cfp, asm.State(self.fp))
+                    yield asm.Mov(self.try_fp, asm.State(self.fp))
 
                     yield asm.Mov(self.defeat, handler)
                     yield asm.Jump(begin_try)
@@ -450,15 +450,15 @@ class CodeGen:
                     yield from self.goto(end_try)
 
                     yield asm.Label(handler)
-                    yield asm.Metadata('catch block')
+                    yield asm.Metadata('stop block')
                     self.effective_defeat = prev_defeat
-                    yield asm.Mov(self.fp, asm.State(self.cfp))
+                    yield asm.Mov(self.fp, asm.State(self.try_fp))
                     yield from ap_bubble.value.to(self.ap)
                     yield from self.pop(ap_bubble)
 
                     yield from self.gen_block(block.handler.body)
                 else:
-                    # By contrast to catch, undo is nice and simple.
+                    # By contrast to stop, undo is nice and simple.
                     # If there would be defeat, the try block won't be
                     # run at all, so there's no mess we need to clean up
                     assert isinstance(block.handler, ast.UndoBlock)
@@ -771,7 +771,6 @@ class CodeGen:
                     static_size=static_size
                 )
             case ast.ArrayInitializer():
-                # TODO: stack overflow / negative length detection
                 length_bubble = yield from self.push_expr(self.r0, expr.length)
                 length = yield from length_bubble.get_fast(self.r0)
                 origin_bubble = self.reserve_word()
@@ -836,14 +835,14 @@ class CodeGen:
 
         abstract_params = tuple(expr.type for expr in args)
         if isinstance(self.env.funcs[name][abstract_params], ast.BuiltinStub):
-            if name == ast.Ident('print') and abstract_params == (DataType.BYTE,):
+            if name == ast.Ident('write') and abstract_params == (DataType.BYTE,):
                 val = yield from self.get_expr_value(self.r1, args[0])
                 yield asm.Yield(val)
                 return self.reserve_type(DataType.VOID)
-            elif name == ast.Ident('println'):
+            elif name == ast.Ident('writeln'):
                 if len(args) != 0:
-                    assert isinstance(self.env.funcs[ast.Ident('print')][abstract_params], ast.BuiltinStub)
-                    result = yield from self.eval_func_call(DataType.VOID, ast.Ident('print'), args)
+                    assert isinstance(self.env.funcs[ast.Ident('write')][abstract_params], ast.BuiltinStub)
+                    result = yield from self.eval_func_call(DataType.VOID, ast.Ident('write'), args)
                     yield from self.pop(result)
                 yield asm.Yield(asm.IntLiteral(ord('\n'), is_char=True))
                 return self.reserve_type(DataType.VOID)

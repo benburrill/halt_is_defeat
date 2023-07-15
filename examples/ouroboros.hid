@@ -25,13 +25,13 @@
 
 void @is_you() {
     try {
-        println("preempt block will not run");
+        writeln("preempt block will not run");
         while (true) {
             preempt {
                 !is_defeat();
             }
         }
     } undo {
-        println("preempt block would run");
+        writeln("preempt block would run");
     }
 }

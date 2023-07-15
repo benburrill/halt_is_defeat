@@ -43,13 +43,13 @@ for now you may ignore this distinction.  Here's a simple program:
 .. code::
 
     void @is_you() {
-        println("Hello world!");
-        print("Some numbers:");
+        writeln("Hello world!");
+        write("Some numbers:");
         for (int i = 1; i <= 10; i += 1) {
-            print(' ');
-            print(i);
+            write(' ');
+            write(i);
         }
-        println();
+        writeln();
     }
 
 Running under ``spasm`` produces the expected output:
@@ -87,18 +87,19 @@ functions cannot be called directly from within you functions, but you
 can create a try block within you to safely run code which may lead to
 defeat.
 
-In this example we use the ``catch`` handler, which treats defeat
-similarly to exceptions in other languages.  The ``catch`` block is run
-when defeat is reached:
+In this example we use the ``stop`` handler, which treats defeat in a
+similar way to how ``catch`` or ``except`` treat exceptions in other
+languages.  When defeat is reached, execution of the ``try`` block stops
+and the ``stop`` block is run:
 
 .. code::
 
     void @is_you() {
         try {
-            println("try block");
+            writeln("try block");
             !is_defeat();
-        } catch {
-            println("catch block");
+        } stop {
+            writeln("stop block");
         }
     }
 
@@ -106,13 +107,14 @@ Output:
 
 .. code::
 
-    $ hidc catch.hid -o catch.s
-    $ spasm catch.s
+    $ hidc stop.hid -o stop.s
+    $ spasm stop.s
     try block
-    catch block
+    stop block
     Reached win flag
-        CPU time: 177 clock cycles
-        Emulator efficiency: 46.21%
+        CPU time: 170 clock cycles
+        Emulator efficiency: 36.80%
+
 
 
 Note that defeat's utility as a replacement for exceptions is limited.
@@ -128,7 +130,7 @@ Time travel
 Sure, it's nice to know when you've made a mistake.  But more often than
 not, we really just wish we could go back and undo it.  In HiD, you can!
 
-The ``undo`` handler works similarly to ``catch``, but it goes back in
+The ``undo`` handler works similarly to ``stop``, but it goes back in
 time and prevents the ``try`` block from running if it would result in
 defeat:
 
@@ -136,10 +138,10 @@ defeat:
 
     void @is_you() {
         try {
-            println("try block");
+            writeln("try block");
             !is_defeat();
         } undo {
-            println("undo block");
+            writeln("undo block");
         }
     }
 
@@ -166,11 +168,11 @@ occur if the loop runs forever:
 
     void @is_you() {
         try {
-            println("The loop runs forever");
+            writeln("The loop runs forever");
             while (true) {}
             !is_defeat();
         } undo {
-            println("The loop terminates");
+            writeln("The loop terminates");
         }
     }
 
