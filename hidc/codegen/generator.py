@@ -151,9 +151,9 @@ halt_inversion = {
 @dc.dataclass
 class CodeGen:
     env: ast.Environment
-    word_size: int = 2
-    stack_size: int = 50 # in words
-    unchecked: bool = False
+    word_size: int   # in bytes
+    stack_size: int  # in words
+    unchecked: bool  # should runtime checks be excluded?
 
     stack: StackPoint                                          = dc.field(init=False, default=StackPoint())
     allocated_arrays: list[ArrayRef]                           = dc.field(init=False, default_factory=list)
