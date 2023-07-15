@@ -37,6 +37,10 @@ stdlib_funcs = {
     ConcreteSignature(Ident('print'), (DataType.INT,)): asm.LabelRef('print_int')
 }
 
+abstract_funcs = {}
+for _csig in stdlib_funcs:
+    abstract_funcs.setdefault(_csig.name, set()).add(_csig.abstract_params)
+
 
 # an interesting idea: we might be able to skip halt propagation in some
 # places in the stdlib print routines (except in cases where the halt

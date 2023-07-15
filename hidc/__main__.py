@@ -1,6 +1,6 @@
 from hidc.lexer import SourceCode
 from hidc.parser import parse
-from hidc.ast import typecheck
+from hidc.ast import Environment
 from hidc.codegen import CodeGen
 from hidc.errors import CompilerError
 from pprint import pprint
@@ -59,7 +59,8 @@ def main():
         return 1
 
     try:
-        ast = typecheck(parse(source))
+        env = Environment.empty()
+        ast = parse(source).evaluate(env)
 
         if args.dump_ast:
             pprint(ast)
@@ -71,7 +72,7 @@ def main():
         #  But currently generate calls make_funcs
         output = args.output if args.output is not None else args.input + '.s'
         with open(output, 'wb') as f:
-            code_gen = CodeGen.from_program(ast, args.word_size // 8, args.stack_size, args.unchecked)
+            code_gen = CodeGen(env, args.word_size // 8, args.stack_size, args.unchecked)
             for line in code_gen.generate():
                 f.write(line)
                 f.write(b'\n')

@@ -57,7 +57,15 @@ class FuncDeclaration(FuncDefinition):
                 body.stmts + (ReturnStatement(body.span.end),),
                 body.span, exit_modes.replace(ExitMode.NONE, ExitMode.RETURN)
             )
-        return FuncDeclaration(self.span, self.ret_type, self.name, self.params, body)
+
+
+        new_decl = FuncDeclaration(self.span, self.ret_type, self.name, self.params, body)
+
+        # Should have already been registered in env.funcs
+        # Update entry to include typechecked body
+        assert env.funcs[self.name][self.param_types] is self
+        env.funcs[self.name][self.param_types] = new_decl
+        return new_decl
 
 
 builtin_stubs = (
@@ -93,6 +101,7 @@ class Program:
     func_decls: tuple[FuncDeclaration, ...]
 
     def evaluate(self, env):
+        env.add_funcs(builtin_stubs)
         env.add_funcs(self.func_decls)
         new_decls = [decl.evaluate(env) for decl in self.var_decls]
         new_funcs = [func.evaluate(env) for func in self.func_decls]

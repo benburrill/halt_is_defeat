@@ -1,5 +1,5 @@
 from .asm import Section
-from hidc.lexer.tokens import DataType, Ident
+from hidc.ast import ArrayType, DataType, Ident
 import dataclasses as dc
 import enum
 
@@ -26,4 +26,14 @@ ConcreteType = DataType | ConcreteArrayType
 @dc.dataclass(frozen=True)
 class ConcreteSignature:
     name: Ident
-    arg_types: tuple[ConcreteType, ...]
+    concrete_params: tuple[ConcreteType, ...]
+
+    @property
+    def abstract_params(self):
+        return tuple(
+            # TODO: maybe property abstract_type on concrete types?
+            #  (including DataType), maybe even on ArrayType as well
+            t if isinstance(t, DataType)
+            else ArrayType(t.el_type, t.access != AccessMode.RW)
+            for t in self.concrete_params
+        )

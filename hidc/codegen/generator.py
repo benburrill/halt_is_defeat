@@ -150,8 +150,7 @@ halt_inversion = {
 
 @dc.dataclass
 class CodeGen:
-    func_decls: dict[ast.Ident, dict[tuple[ast.Type, ...], ast.FuncDeclaration]]
-    global_decls: dict[str, ast.Declaration]
+    env: ast.Environment
     word_size: int = 2
     stack_size: int = 50 # in words
     unchecked: bool = False
@@ -201,7 +200,7 @@ class CodeGen:
         if ((self.stack_size + 5) * self.word_size) > self.max_signed:
             raise CodeGenError('Stack size too large', ())
 
-        is_you = self.func_decls.get(ast.Ident.you('is_you'), {})
+        is_you = self.env.funcs.get(ast.Ident.you('is_you'), {})
 
         if not is_you:
             raise CodeGenError('Level is empty, expected entry point @is_you(...)', ())
@@ -277,17 +276,6 @@ class CodeGen:
         self.func_labels.update(stdlib.stdlib_funcs)
         self.label_for_func(ConcreteSignature(ast.Ident.you('is_you'), tuple(concrete_types)))
 
-    @classmethod
-    def from_program(cls, program: ast.Program, word_size, stack_size, unchecked):
-        func_decls = {}
-        var_decls = {}
-        for func_decl in program.func_decls:
-            param_types = tuple(p.type for p in func_decl.params)
-            func_decls.setdefault(func_decl.name, {})[param_types] = func_decl
-        for var_decl in program.var_decls:
-            var_decls[var_decl.var.name] = var_decl
-        return cls(func_decls, var_decls, word_size, stack_size, unchecked)
-
     def generate(self):
         self.make_funcs()
         if self.argv_specs:
@@ -331,16 +319,11 @@ class CodeGen:
     def make_funcs(self):
         while self.func_queue:
             csig = self.func_queue.pop()
-            abstract_types = tuple(
-                # TODO: maybe property abstract_type on concrete types?
-                #  (including DataType), maybe even on ArrayType as well
-                t if isinstance(t, DataType)
-                else ArrayType(t.el_type, t.access != AccessMode.RW)
-                for t in csig.arg_types
-            )
+            decl = self.env.funcs[csig.name][csig.abstract_params]
+            assert isinstance(decl, ast.FuncDeclaration)
 
             self.func_table[csig] = list(
-                self.gen_func(csig, self.func_decls[csig.name][abstract_types])
+                self.gen_func(csig, decl)
             )
 
     def gen_func(self, csig: ConcreteSignature, func: ast.FuncDeclaration):
@@ -360,7 +343,7 @@ class CodeGen:
         # Reserve space for RA and passed arguments
         bubble = self.reserve_word()
         self.return_address = bubble.value
-        for arg_type, param in zip(csig.arg_types, func.params, strict=True):
+        for arg_type, param in zip(csig.concrete_params, func.params, strict=True):
             arg_bubble = self.reserve_type(arg_type)
             self.local_vars[param.var.name] = arg_bubble.value
             bubble += arg_bubble
@@ -862,29 +845,31 @@ class CodeGen:
     def eval_func_call(self, ret_type: ast.DataType, name: ast.Ident,
                        args: tuple[ast.Expression, ...])->asm.InstrGen[ValueBubble]:
 
-        if name == ast.Ident('print') and len(args) == 1:
-            if args[0].type == DataType.BYTE:
-                arg = yield from self.get_expr_value(self.r1, args[0])
-                yield asm.Yield(arg)
+        abstract_params = tuple(expr.type for expr in args)
+        if isinstance(self.env.funcs[name][abstract_params], ast.BuiltinStub):
+            if name == ast.Ident('print') and abstract_params == (DataType.BYTE,):
+                val = yield from self.get_expr_value(self.r1, args[0])
+                yield asm.Yield(val)
                 return self.reserve_type(DataType.VOID)
-        elif name == ast.Ident('println'):
-            # TODO: erm, this isn't really quite right...
-            #  we only want to do the translation from println to print
-            #  if the signature matches one of ours.
-            if len(args) != 0:
-                result = yield from self.eval_func_call(DataType.VOID, ast.Ident('print'), args)
-                yield from self.pop(result)
-            yield asm.Yield(asm.IntLiteral(ord('\n'), is_byte=True))
-            return self.reserve_type(DataType.VOID)
-        elif name == ast.Ident.defeat('is_defeat') and len(args) == 0:
-            if self.effective_defeat != stdlib.halt:
-                yield asm.Jump(self.effective_defeat)
-            yield asm.Halt()
-            return self.reserve_type(DataType.VOID)
-        elif name == ast.Ident.defeat('truth_is_defeat') and len(args) == 1:
-            if args[0].type == DataType.BOOL:
-                yield from self.truth_is_defeat(args[0])
+            elif name == ast.Ident('println'):
+                if len(args) != 0:
+                    assert isinstance(self.env.funcs[ast.Ident('print')][abstract_params], ast.BuiltinStub)
+                    result = yield from self.eval_func_call(DataType.VOID, ast.Ident('print'), args)
+                    yield from self.pop(result)
+                yield asm.Yield(asm.IntLiteral(ord('\n'), is_byte=True))
                 return self.reserve_type(DataType.VOID)
+            elif name == ast.Ident.defeat('is_defeat'):
+                assert not args
+                if self.effective_defeat != stdlib.halt:
+                    yield asm.Jump(self.effective_defeat)
+                yield asm.Halt()
+                return self.reserve_type(DataType.VOID)
+            elif name == ast.Ident.defeat('truth_is_defeat'):
+                arg, = args
+                yield from self.truth_is_defeat(arg)
+                return self.reserve_type(DataType.VOID)
+            elif abstract_params not in stdlib.abstract_funcs.get(name, set()):
+                raise InternalCompilerError(f'Unimplemented stdlib function: {name}, {abstract_params}')
 
         end_call = self.add_label('end_call')
 
@@ -895,16 +880,16 @@ class CodeGen:
         bubble = self.reserve_word()
         yield from bubble.value.set(end_call)
 
-        arg_types = []
+        concrete_params = []
         for arg in args:
             arg_bubble = yield from self.push_expr(self.r1, arg)
             if isinstance(arg.type, DataType):
-                arg_types.append(arg.type)
+                concrete_params.append(arg.type)
             else:
-                arg_types.append(arg_bubble.value.type)
+                concrete_params.append(arg_bubble.value.type)
             bubble += arg_bubble
 
-        label = self.label_for_func(ConcreteSignature(name, tuple(arg_types)))
+        label = self.label_for_func(ConcreteSignature(name, tuple(concrete_params)))
         yield asm.Add(self.fp, asm.State(self.fp), asm.IntLiteral(-offset))
         yield from self.goto(label)
         yield asm.Label(end_call)
@@ -926,7 +911,7 @@ class CodeGen:
             else:
                 const = var.const
             access = self.make_global(
-                self.global_decls[var.name].init,
+                self.env.vars.globals[var.name].init,
                 const, label_prefix=f'var_{var.name}'
             )
             self.global_vars[var.name] = access

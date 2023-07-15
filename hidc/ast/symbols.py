@@ -53,6 +53,10 @@ class Environment:
     options: dict = dc.field(default_factory=dict)
     return_type: DataType = None
 
+    @classmethod
+    def empty(cls, **options):
+        return cls(VarTable(), {}, options)
+
     def new_child(self, return_type=None):
         return Environment(
             self.vars.new_child(), self.funcs, self.options,

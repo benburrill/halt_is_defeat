@@ -1,6 +1,6 @@
 from hidc.lexer import SourceCode
 from hidc.parser import parse
-from hidc.ast import typecheck
+from hidc.ast import Environment
 from hidc.errors import TypeCheckError
 
 from pytest import raises
@@ -8,7 +8,7 @@ from pytest import raises
 
 def assert_good(string, **options):
     unchecked = parse(SourceCode.from_string(string))
-    checked = typecheck(unchecked, **options)
+    checked = unchecked.evaluate(Environment.empty(**options))
     # These are dummy assertions which are kinda pointless to check
     # Ideally I'd like to walk through the tree and make sure all types
     # match up, as they should after successful typechecking
@@ -18,7 +18,7 @@ def assert_good(string, **options):
 def assert_bad(string, **options):
     unchecked = parse(SourceCode.from_string(string))
     with raises(TypeCheckError):
-        typecheck(unchecked, **options)
+        unchecked.evaluate(Environment.empty(**options))
 
 
 def test_return_type():

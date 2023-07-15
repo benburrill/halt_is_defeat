@@ -273,8 +273,8 @@ need a better computer.
 If using 24 bit words, I'd recommend decreasing the stack size to 100
 words or less for testing, so that if you accidentally write a tight
 24-bit loop ``spasm`` won't need more than 8 GB if that loop needs to be
-predicted (assuming no globals).  If using more than 24 bits, you are on
-your own, god help you.
+predicted (assuming no non-const globals).  If using more than 24 bits,
+you are on your own, god help you.
 
 Fatal errors and undefined behavior
 -----------------------------------
