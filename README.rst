@@ -391,7 +391,7 @@ Standard library
 - ``empty all_is_win()`` - enter the win state, ending program execution and starting infinite loop
 - ``empty all_is_broken()`` - enter the error state, ending program execution and starting infinite loop
 - ``empty sleep(int millis)`` - sleep for the given number of milliseconds
-- ``empty debug()`` - emits debug flag, results are implementation dependent.  On ``spasm`` will dump memory to stdout.
+- ``empty debug()`` - emits debug flag, results are platform-dependent.  On ``spasm`` will dump memory to stdout.
 
 Operators
 ---------
@@ -412,22 +412,21 @@ Types
 The ``empty`` type signifies a lack of value, it may only be used as a
 return type.
 
-Array types, eg ``int[]`` refer to sequences of scalar values.
+Array types, eg ``int[]`` are sequences of scalar values.
 
 Scalar types:
- * ``int`` - Word-sized numeric type
+ * ``int`` - Word-sized signed numeric type.
  * ``byte`` - Byte-sized data type.  Coercible to ``int``.
  * ``bool`` - Boolean value, either ``true`` or ``false``.
  * ``string`` - Nominally utf-8 encoded byte-string.  Coercible to ``const byte[]``.
 
 For scalar types, constness is an attribute of variables, not of their
 type, and determines whether the variable can be reassigned.  For array
-types, constness is part of the type, and the variable referring to the
-array can never be reassigned.
+types, constness *is* part of the type, and determines whether array
+elements can be modified.  The variable referring to an array can never
+be reassigned.
 
-Some literals have special coercion rules.
-
-Literals:
+Types and special coercion rules of literals:
  * Numeric literals: ``5``, ``0xFF``, ``1_000``, etc - Type: ``int``, but coercible to ``byte``
  * Character literals: ``'a'``, ``'\n'`` - Type: ``byte``
  * String literals: "Hello \u{1F30E}" - Type: ``string``
@@ -448,3 +447,42 @@ Allowed explicit type casts:
  * (array literal) ``is T[]`` (valid if all entries in the array literal
    can be cast to ``T``, and retains the ``const`` flexibility of array
    literals).
+
+Blocks and functions
+--------------------
+You functions (prefixed by ``@``) have special calling restrictions to
+ensure a return path that will never reach defeat.  This invariant
+allows ``try`` blocks and speculation to be used in a modular and
+consistent way, so these may only be used within you-functions.
+
+Defeat functions (prefixed by ``!``) can cause defeat.  They may call
+other defeat functions, just as you can in a ``try`` block.  ``preempt``
+can only be used directly within ``try`` blocks, not defeat functions,
+as it would otherwise break modularity in confusing ways.
+
+Ordinary functions (no prefix) cannot call either you functions or
+defeat functions, but may be called from anywhere.
+
+Summary of what’s allowed in different blocks:
+*(unless otherwise stated, blocks preserve the rules of the block they are contained by)*
+
+You functions:
+ * Function calls: ordinary functions, you functions
+ * ``try``
+
+   * Function calls: ordinary functions, defeat functions
+   * Preempt blocks
+   * Conventional control blocks (``while``, ``if``, etc)
+
+ * ``undo`` or ``stop`` after ``try``
+ * Speculation operator (``??``)
+
+   * Function calls: ordinary functions
+
+ * Conventional control blocks (``while``, ``if``, etc)
+Defeat functions:
+ * Function calls: ordinary functions, defeat functions
+ * Conventional control blocks (``while``, ``if``, etc)
+Ordinary functions:
+ * Function calls: ordinary functions
+ * Conventional control blocks (``while``, ``if``, etc)
