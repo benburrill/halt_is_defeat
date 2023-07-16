@@ -12,7 +12,10 @@ Key features of Halt is Defeat:
  * Function overloading
  * Stack-allocated variable-length arrays
  * Type coercion and inference of ambiguous expressions
- * P = NP
+ * P = NP [#]_
+
+.. [#] For some definition of "P" and "NP".  Actual performance of
+       linear-time SAT solvers depends on hardware support.
 
 
 Quick start guide
@@ -214,6 +217,52 @@ bit like an inside-out try.  The ``preempt`` block is run if not running
 the ``preempt`` block would lead to defeat.  It is used within ``try``
 blocks.
 
+Here we use the ``preempt`` block to write a function that finds the
+maximum value of an array, returning early as soon as this value is
+first encountered:
+
+.. code::
+
+    int @max(const int[] arr) {
+        try {
+            int max_val = arr[0];
+            for (int i = 1; i < arr.length; i += 1) {
+                if (arr[i] > max_val) {
+                    max_val = arr[i];
+                    preempt {
+                        return max_val;
+                    }
+                }
+            }
+
+            !is_defeat();
+        } undo {
+            return arr[0];
+        }
+    }
+
+We have placed ``!is_defeat()`` at the end of the loop, which means that
+it would be defeat for the loop to complete normally.  The ``return``
+provides the only escape from this looming existential threat, but the
+``if`` statement means we only have the opportunity to take the return
+whenever we find a value larger than any previous one.
+
+The ``preempt`` block containing the return will run if not doing so
+would lead to defeat.  If no larger value will be found, the ``preempt``
+block needs to be run, since otherwise we'd be heading to defeat at the
+end of the loop.  However, if there's a larger value in the future, the
+``preempt`` block is not run -- a return would need to occur in the
+future, so we are safe from defeat.
+
+In this code, ``preempt`` is doing most of the work.  The ``try/undo``
+is mostly serving just to set up an arena for ``preempt`` to be used,
+and only handles the special case where ``arr[0]`` is the maximum.
+
+If you want to test it out, the full program can be found in
+`<examples/max.hid>`_, and takes command-line arguments so you can
+easily play around with different inputs.
+
+What time-traveling algorithms can you come up with?
 
 Other features
 ==============
@@ -427,8 +476,8 @@ elements can be modified.  The variable referring to an array can never
 be reassigned.
 
 Types and special coercion rules of literals:
- * Numeric literals: ``5``, ``0xFF``, ``1_000``, etc - Type: ``int``, but coercible to ``byte``
- * Character literals: ``'a'``, ``'\n'`` - Type: ``byte``
+ * Numeric literals: ``5``, ``0xFF``, ``1_000`` - Type: ``int``, but coercible to ``byte``
+ * Byte/"character" literals: ``'a'``, ``'\n'`` - Type: ``byte``
  * String literals: "Hello \u{1F30E}" - Type: ``string``
  * Boolean literals: ``true`` or ``false`` - Type: ``bool``
  * Array literals: ``[1, 2, f(x)]`` - Type: array of the first type all
@@ -442,7 +491,7 @@ Allowed explicit type casts:
  * (``byte`` | ``bool``) ``is int``
  * (``int`` | ``bool``) ``is byte``
  * (``int`` | ``byte`` | ``string`` | ``T[]``) ``is bool`` (arrays and
-   strings are considered ``true`` if they have non-zero length)
+   strings are truthy if they have non-zero length)
  * (``string``) ``is byte[]`` (result is ``const byte[]``)
  * (array literal) ``is T[]`` (valid if all entries in the array literal
    can be cast to ``T``, and retains the ``const`` flexibility of array
@@ -451,38 +500,41 @@ Allowed explicit type casts:
 Blocks and functions
 --------------------
 You functions (prefixed by ``@``) have special calling restrictions to
-ensure a return path that will never reach defeat.  This invariant
-allows ``try`` blocks and speculation to be used in a modular and
+ensure a return path that will never reach defeat.  This invariant is
+what allows ``try`` blocks and speculation to be used in a modular and
 consistent way, so these may only be used within you-functions.
 
 Defeat functions (prefixed by ``!``) can cause defeat.  They may call
-other defeat functions, just as you can in a ``try`` block.  ``preempt``
-can only be used directly within ``try`` blocks, not defeat functions,
-as it would otherwise break modularity in confusing ways.
+other defeat functions, just as you can in a ``try`` block.  However,
+``preempt`` can only be used directly within ``try`` blocks, not defeat
+functions, as it would otherwise break modularity in confusing ways.
 
 Ordinary functions (no prefix) cannot call either you functions or
 defeat functions, but may be called from anywhere.
 
-Summary of what’s allowed in different blocks:
-*(unless otherwise stated, blocks preserve the rules of the block they are contained by)*
+Summary of what's allowed in different blocks
+.............................................
+*(Unless otherwise stated, blocks preserve the rules of the block they are contained by)*
 
 You functions:
  * Function calls: ordinary functions, you functions
- * ``try``
+ * Conventional control blocks (``while``, ``if``, etc)
+ * ``try`` blocks
 
    * Function calls: ordinary functions, defeat functions
-   * Preempt blocks
    * Conventional control blocks (``while``, ``if``, etc)
+   * ``preempt`` blocks
 
- * ``undo`` or ``stop`` after ``try``
+ * ``undo`` or ``stop`` blocks after ``try``
  * Speculation operator (``??``)
 
    * Function calls: ordinary functions
 
- * Conventional control blocks (``while``, ``if``, etc)
 Defeat functions:
  * Function calls: ordinary functions, defeat functions
  * Conventional control blocks (``while``, ``if``, etc)
 Ordinary functions:
  * Function calls: ordinary functions
  * Conventional control blocks (``while``, ``if``, etc)
+Global scope:
+ * Declarations only
