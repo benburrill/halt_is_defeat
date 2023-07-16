@@ -12,16 +12,20 @@ Key features of Halt is Defeat:
  * Function overloading
  * Stack-allocated variable-length arrays
  * Type coercion and inference of ambiguous expressions
- * P = NP [#]_
-
-.. [#] For some definition of "P" and "NP".  Actual performance of
-       linear-time SAT solvers depends on hardware support.
-
+ * P = NP
 
 Quick start guide
 =================
-To install the ``hidc`` compiler
-[Installation instructions]
+The ``hidc`` compiler requires Python >= 3.10.  It has no other
+dependencies and may be run directly from this directory:
+``python3 -m hidc examples/hello.hid -o hello.s``
+
+Alternatively, you may install the ``hidc`` executable:
+
+.. code::
+
+    $ pip3 install --editable .
+    $ hidc examples/hello.hid -o hello.s
 
 The ``hidc`` compiler currently has a single backend, targeting the
 Sphinx instruction set architecture.  As of this writing, Sphinx
@@ -262,7 +266,7 @@ If you want to test it out, the full program can be found in
 `<examples/max.hid>`_, and takes command-line arguments so you can
 easily play around with different inputs.
 
-What time-traveling algorithms can you come up with?
+*What time-traveling algorithms can you come up with?*
 
 Other features
 ==============
