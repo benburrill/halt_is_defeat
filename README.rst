@@ -80,7 +80,7 @@ interrupt (ctrl-c) to forcibly stop the running program.  Attempting to
 stop programs running on a real Sphinx processor is not recommended and
 may destroy the universe.
 
-Upon reaching the ``win`` flag, the ``spasm`` emulator also produces
+When the ``win`` flag is encountered, the ``spasm`` emulator displays
 some statistics.  The CPU time is the number of Sphinx instructions
 executed (each instruction takes 1 clock cycle).  The emulator
 efficiency is an implementation detail of the emulator and may be
@@ -217,6 +217,43 @@ blocks.
 
 Other features
 ==============
+
+Arrays and strings
+------------------
+
+HiD does not have heap-based dynamic allocation, so in order to enable
+safe stack-based array allocation, HiD imposes a few restrictions on the
+use of arrays:
+
+- Arrays cannot be returned from functions.  If you want to "return" an
+  array, you must take an output parameter and mutate it.
+- Array variables (ie the reference to the array) cannot be reassigned.
+  In essence, the constness of an array applies only to its *elements*,
+  not the reference itself (which is always const).
+
+There are two ways to create a new array.  Array literals, such as
+``[1, 2, f(x)]`` are free expressions, which may be assigned to an array
+variable like ``int[] arr = [1, 2, f(x)];`` (or
+``const int[] arr = [1, 2, f(x)];``).
+Array initializers are a special syntax for creating uninitialized array
+variables of arbitrary length: ``int arr[f(x)];``
+
+When passed to functions, a non-const array may be coerced into a const
+array, but not vice-versa.  This means that unless you intend on
+mutating the arrays passed to your functions, you should write your
+functions to take const arrays.
+
+Boolean arrays are bit-vectors, so they are memory-efficient, but a bit
+slow.
+
+Strings are similar to ``const byte[]``, and in fact may be implicitly
+coerced to ``const byte[]``.  However, strings make a different set of
+tradeoffs than arrays.  Strings cannot be dynamically created, but they
+can be used as freely as other scalar types -- they can be returned,
+reassigned, and used as elements of an array (whereas arrays cannot be
+nested).
+
+The length of arrays and strings may be obtained with ``var.length``.
 
 The speculation operator
 ------------------------
