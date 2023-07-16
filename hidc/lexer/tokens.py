@@ -94,6 +94,7 @@ class OpToken(EnumToken):
     AND = 'and'
     NOT = 'not'
     IS = 'is'
+    SPECULATION = '??'
 
 
 @include_enum

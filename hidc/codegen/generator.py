@@ -693,6 +693,18 @@ class CodeGen:
                     tuple(bubble.value.set(asm.IntLiteral(0)))
                 )
                 return bubble
+            case ast.Speculation():
+                # TODO: the case of speculation in bool_expr_branch can
+                #  be optimized, especially eg: if (f() ?? true) {}
+                end_speculation = self.add_label('end_speculation')
+                right_bubble = yield from self.eval_expr(r_out, expr.right, keep=True)
+                yield from right_bubble.value.to(r_out)
+                yield asm.Jump(end_speculation)
+                left = yield from self.get_expr_value(self.r1, expr.left)
+                right = yield from self.pop_value(self.r0, right_bubble)
+                yield asm.Heq(left, right)
+                yield from left.to(r_out)
+                yield asm.Label(end_speculation)
             case ast.VariableLookup():
                 is_global, access = self.lookup_var(expr.var)
                 if keep and is_global and not expr.var.const:

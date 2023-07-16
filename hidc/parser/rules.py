@@ -96,6 +96,14 @@ class CurrentNode(Rule):
         return start, start
 
 
+class Teleport(Rule):
+    def __init__(self, node):
+        self.node = node
+
+    def process(self, start):
+        return start, self.node
+
+
 async def cursor():
     if node := await CurrentNode():
         return node.head.span.start

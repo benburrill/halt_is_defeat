@@ -212,6 +212,22 @@ blocks.
 Other features
 ==============
 
+The speculation operator
+------------------------
+The speculation operator, ``??`` may be used as an alternative to using
+``try/undo`` for the simple case where you simply want to avoid
+evaluating an expression unless it would produce an unexpected value.
+For example ``sum(arr) ?? 0`` will not evaluate ``sum(arr)`` and simply
+return 0 if evaluating ``sum(arr)`` would have returned 0.  Otherwise,
+``sum(arr)`` will be evaluated and the result returned.
+
+The right-hand side will always be evaluated, and if both sides are
+evaluated, the right side will be evaluated first.
+
+Just like ``try``, speculation can only be used by you.
+Additionally, the operands of ``??`` must be ordinary expressions --
+neither you-functions nor defeat-functions may be used.
+
 Command-line arguments
 ----------------------
 Halt is Defeat makes use of Sphinx's robust argument specifiers, which I

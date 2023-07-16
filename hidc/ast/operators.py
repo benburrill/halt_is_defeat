@@ -34,7 +34,7 @@ class Operator(Expression):
     token: Abstract[OpToken]
 
     @abstractmethod
-    def operate(self, *args):
+    def simplify(self):
         pass
 
     @property
@@ -88,6 +88,10 @@ class Unary(Operator):
 class BooleanOp(Operator):
     type = DataType.BOOL
 
+    @abstractmethod
+    def operate(self, *args):
+        pass
+
     def simplify(self):
         if all(isinstance(arg, PrimitiveValue) for arg in self.args):
             return BoolValue(
@@ -128,6 +132,10 @@ class EqualityOp(BooleanOp):
 
 class ArithmeticOp(Operator):
     type = DataType.INT
+
+    @abstractmethod
+    def operate(self, *args):
+        pass
 
     def simplify(self):
         if all(isinstance(arg, IntValue) for arg in self.args):
@@ -250,6 +258,27 @@ class Eq(Binary, EqualityOp):
 class Ne(Binary, EqualityOp):
     token = OpToken.NE
     operate = operator.ne
+
+class Speculation(Binary):
+    token = OpToken.SPECULATION
+
+    def simplify(self):
+        # Since self.right could have side effects, both left and right
+        # need to be PrimitiveValue to be simplified.
+        if all(isinstance(arg, PrimitiveValue) for arg in self.args):
+            return self.left
+        return self
+
+    def evaluate(self, env):
+        left = self.left.evaluate(env)
+        if left.type not in {DataType.BYTE, DataType.INT, DataType.BOOL}:
+            raise TypeCheckError(f'Can only speculate on byte, int, or bool, not {left.type}', left.span)
+        right = self.right.evaluate(env).coerce(left.type)
+        return type(self)(self.op_span, left, right).simplify()
+
+    @property
+    def type(self):
+        return self.left.type
 
 # Is isn't considered a true operator, it's just an expression
 @dc.dataclass(frozen=True)

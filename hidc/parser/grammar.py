@@ -174,8 +174,27 @@ async def ps_expr7(ctx):
     return await bin_op(ps_expr6(ctx), {OpToken.AND: And})
 
 @Parser.routine('expression')
-async def ps_expr(ctx):
+async def ps_expr8(ctx):
     return await bin_op(ps_expr7(ctx), {OpToken.OR: Or})
+
+@Parser.routine('expression')
+async def ps_expr(ctx):
+    prev_node = await CurrentNode()
+    if not (left := await ps_expr8(ctx)): return
+    if lxm := await Exact(OpToken.SPECULATION):
+        if BlockContext.YOU not in ctx:
+            raise ParserError('speculation outside of you', lxm.span)
+        # Need to backtrack and re-evaluate in new context
+        await Teleport(prev_node)
+        new_ctx = (ctx & ~BlockContext.YOU) | BlockContext.FUNC
+        # We can't use bin_op, since it would allow f() ?? g() ?? h()
+        # which is not permitted for speculation.
+        left = await expect(ps_expr8(new_ctx))
+        await expect(Exact(OpToken.SPECULATION))
+        right = await expect(ps_expr8(new_ctx))
+        return Speculation(lxm.span, left, right)
+    else:
+        return left
 
 
 @Parser.routine('assignment')
