@@ -233,10 +233,10 @@ use of arrays:
 
 There are two ways to create a new array.  Array literals, such as
 ``[1, 2, f(x)]`` are free expressions, which may be assigned to an array
-variable like ``int[] arr = [1, 2, f(x)];`` (or
-``const int[] arr = [1, 2, f(x)];``).
+variable ``baba`` like ``int[] baba = [1, 2, f(x)];`` (or
+``const int[] baba = [1, 2, f(x)];``).
 Array initializers are a special syntax for creating uninitialized array
-variables of arbitrary length: ``int arr[f(x)];``
+variables of arbitrary length: ``int baba[f(x)];``
 
 When passed to functions, a non-const array may be coerced into a const
 array, but not vice-versa.  This means that unless you intend on
@@ -253,13 +253,14 @@ can be used as freely as other scalar types -- they can be returned,
 reassigned, and used as elements of an array (whereas arrays cannot be
 nested).
 
-The length of arrays and strings may be obtained with ``var.length``.
+The length of the array or string ``baba`` may be obtained with
+``baba.length``.
 
 The speculation operator
 ------------------------
 The speculation operator, ``??`` may be used as an alternative to using
 ``try/undo`` for the simple case where you simply want to avoid
-evaluating an expression unless it would produce an unexpected value.
+evaluating an expression unless it would produce an "unexpected" value.
 For example ``sum(arr) ?? 0`` will not evaluate ``sum(arr)`` and simply
 return 0 if evaluating ``sum(arr)`` would have returned 0.  Otherwise,
 ``sum(arr)`` will be evaluated and the result returned.
@@ -372,3 +373,78 @@ checked operations become undefined behavior:
 
 Be aware that HiD's nasal demons can time travel, so undefined behavior
 may result in a program's defeat before it even starts, etc.
+
+Language reference
+==================
+
+Standard library
+----------------
+- ``empty write(string s)`` / ``empty write(const byte[] s)`` - writes
+  out all bytes of data from the string / byte array
+- ``empty write(int i)`` - writes the integer in base 10
+- ``empty write(byte b)`` - writes a single byte of data
+- ``empty write(bool b)`` - writes the string "true" or "false"
+- ``empty writeln()`` - equivalent to ``write('\n')``
+- ``empty writeln(T x)`` - ``write(x)`` followed by ``writeln()``
+- ``empty !is_defeat()`` - causes defeat
+- ``empty !truth_is_defeat(bool cond)`` - equivalent to ``if (cond) { !is_defeat(); }``
+- ``empty all_is_win()`` - enter the win state, ending program execution and starting infinite loop
+- ``empty all_is_broken()`` - enter the error state, ending program execution and starting infinite loop
+- ``empty sleep(int millis)`` - sleep for the given number of milliseconds
+- ``empty debug()`` - emits debug flag, results are implementation dependent.  On ``spasm`` will dump memory to stdout.
+
+Operators
+---------
+In order of precedence:
+ * Unary ``+``, ``-``, ``not``
+ * ``is`` (typecast pseudo-operator)
+ * ``*``, ``/``, ``%``
+ * ``+``, ``-``
+ * ``==``, ``!=``, ``<``, ``<=``, ``>``, ``>=``
+ * ``and`` (short-circuiting logical and)
+ * ``or`` (short-circuiting logical or)
+ * ``??`` (speculation)
+
+Augmented assignments: ``+=``, ``-=``, ``*=``, ``/=``, ``%=``
+
+Types
+-----
+The ``empty`` type signifies a lack of value, it may only be used as a
+return type.
+
+Array types, eg ``int[]`` refer to sequences of scalar values.
+
+Scalar types:
+ * ``int`` - Word-sized numeric type
+ * ``byte`` - Byte-sized data type.  Coercible to ``int``.
+ * ``bool`` - Boolean value, either ``true`` or ``false``.
+ * ``string`` - Nominally utf-8 encoded byte-string.  Coercible to ``const byte[]``.
+
+For scalar types, constness is an attribute of variables, not of their
+type, and determines whether the variable can be reassigned.  For array
+types, constness is part of the type, and the variable referring to the
+array can never be reassigned.
+
+Some literals have special coercion rules.
+
+Literals:
+ * Numeric literals: ``5``, ``0xFF``, ``1_000``, etc - Type: ``int``, but coercible to ``byte``
+ * Character literals: ``'a'``, ``'\n'`` - Type: ``byte``
+ * String literals: "Hello \u{1F30E}" - Type: ``string``
+ * Boolean literals: ``true`` or ``false`` - Type: ``bool``
+ * Array literals: ``[1, 2, f(x)]`` - Type: array of the first type all
+   entries can be coerced to, but is coercible to any type all entries
+   can be coerced to.  Preferentially ``const``, but may be coerced to
+   non-const.
+
+Explicit type casts may be performed with ``is``, eg ``baba is byte``.
+
+Allowed explicit type casts:
+ * (``byte`` | ``bool``) ``is int``
+ * (``int`` | ``bool``) ``is byte``
+ * (``int`` | ``byte`` | ``string`` | ``T[]``) ``is bool`` (arrays and
+   strings are considered ``true`` if they have non-zero length)
+ * (``string``) ``is byte[]`` (result is ``const byte[]``)
+ * (array literal) ``is T[]`` (valid if all entries in the array literal
+   can be cast to ``T``, and retains the ``const`` flexibility of array
+   literals).
