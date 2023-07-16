@@ -2,6 +2,14 @@ from spasm.parser import Parser as SphinxParser
 from spasm.context import ExecutionContext, VirtualContext
 from spasm.emulator import Emulator
 
+from hidc.lexer import SourceCode
+from hidc.parser import parse
+from hidc.ast import Environment
+from hidc.codegen import CodeGen
+from hidc.errors import CompilerError, CodeGenError
+
+from pytest import raises
+
 class RecorderContext(ExecutionContext):
     def __init__(self):
         super().__init__()
@@ -21,7 +29,7 @@ class RecorderContext(ExecutionContext):
     def on_flag(self, prog, flag):
         self.flags.append(flag)
 
-def make_emulator(lines, args):
+def make_emulator(lines, args=()):
     ps = SphinxParser(args)
     ps.parse_lines(lines)
     return Emulator(
@@ -39,6 +47,11 @@ def run_to_flag(emulator, max_cycles=10000):
             return emulator
     assert False, 'max cycles exceeded'
 
+def compile(source, word_size=2, stack_size=500, unchecked=False, **options):
+    env = Environment.empty(**options)
+    parse(SourceCode.from_string(source)).evaluate(env)
+    cg = CodeGen(env, word_size=word_size, stack_size=stack_size, unchecked=unchecked)
+    return list(cg.gen_lines())
 
 def test_basic():
     emulator = run_to_flag(make_emulator([
@@ -58,3 +71,35 @@ def test_basic():
 
     assert emulator.rctx.flags == ['win']
     assert list(emulator.rctx.bytes) == [3, 2, 1, 0]
+
+def test_hello():
+    prog = compile("""
+    empty @is_you() {
+        writeln("Hello world!");
+    }
+    """)
+
+    emulator = run_to_flag(make_emulator(prog))
+    assert emulator.rctx.flags == ['win']
+    assert bytes(emulator.rctx.bytes) == b'Hello world!\n'
+
+def test_ints():
+    prog = compile("""
+    empty @is_you() {
+        writeln(0);
+        writeln(1);
+        writeln(-1);
+        writeln(32767);
+        writeln(-32768);
+    }
+    """)
+
+    emulator = run_to_flag(make_emulator(prog))
+    assert emulator.rctx.flags == ['win']
+    assert bytes(emulator.rctx.bytes).splitlines(keepends=True) == [
+        b'0\n',
+        b'1\n',
+        b'-1\n',
+        b'32767\n',
+        b'-32768\n'
+    ]
