@@ -22,10 +22,7 @@ int @divide(int n) {
                 result += b;
             }
 
-            preempt {
-                continue;
-            }
-
+            preempt { continue; }
             break;
         }
 

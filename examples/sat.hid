@@ -1,3 +1,5 @@
+// An O(n) CNF-SAT solver
+
 bool @satisfy(const int[] rules, bool[] result) {
     try {
         for (int i = 0; i < result.length; i += 1) {
@@ -9,9 +11,7 @@ bool @satisfy(const int[] rules, bool[] result) {
             break;
         }
 
-        if (not test_rules(rules, result)) {
-            !is_defeat();
-        }
+        !truth_is_defeat(not test_rules(rules, result));
     } undo {
         return false;
     }

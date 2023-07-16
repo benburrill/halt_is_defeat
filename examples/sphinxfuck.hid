@@ -9,6 +9,13 @@ empty @sphinxfuck(string src, byte[] mem, const byte[] input) {
     // NOTE: there's a good reason why steps is byte rather than int!
     // Under emulation, spasm won't detect a loop until the sphinxfuck
     // program has been in a loop long enough for steps to wrap around.
+    // So even just with a byte, this seemingly harmless counter means
+    // your sphinxfuck programs may take up to 256 times longer to
+    // emulate than they otherwise would.
+    // If you want to play around with sphinxfuck for its own sake, I
+    // recommend either compiling directly to Sphinx (it's just a simple
+    // 1-to-1 translation), or writing your own purpose-built sphinxfuck
+    // emulator.
     byte steps = 0;
 
     try {
@@ -94,10 +101,9 @@ empty @is_you(byte[] args) {
     }
 
     @sphinxfuck(
-        // This program computes input % 2 by predicting the future and
-        // getting stuck in an infinite loop if the number is odd.
+        // This program computes input_num % 2 by predicting the future
+        // and getting stuck in an infinite loop if the number is odd.
         "[>+.<@,(!--]?!)>.<@(]",
-        buf,
-        [input_num]
+        buf, [input_num]
     );
 }
