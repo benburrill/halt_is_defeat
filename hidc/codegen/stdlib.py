@@ -84,23 +84,26 @@ stdlib_lines = list(filter(None, textwrap.dedent("""
         lwso [r0], [fp], -3w
         lwso [r1], [fp], -2w
         j write_string_loop
+        hgt [r1], 0
+        j write_string_done
         halt
     write_string:
         lwso [r0], [fp], -2w
         lwc [r1], [r0]
         add [r0], [r0], 1w
-        write_string_loop:
+        j write_string_loop
+        hgt [r1], 0
         j write_string_done
+        halt
+        write_string_loop:
         hle [r1], 0
             lbc [r2], [r0]
             yield [r2]
             add [r0], [r0], 1
             sub [r1], [r1], 1
         j write_string_loop
-        halt
-        write_string_done:
         hgt [r1], 0
-        write_return:
+        write_string_done:
         lwso [r0], [fp], -1w
         j [r0]
         halt
@@ -109,14 +112,21 @@ stdlib_lines = list(filter(None, textwrap.dedent("""
     write_state_byte_array:
         lwso [r0], [fp], -3w
         lwso [r1], [fp], -2w
+        j write_state_byte_array_loop
+        hgt [r1], 0
+        j write_state_byte_array_done
+        halt
         write_state_byte_array_loop:
-        j write_string_done
         hle [r1], 0
             lbs [r2], [r0]
             yield [r2]
             add [r0], [r0], 1
             sub [r1], [r1], 1
         j write_state_byte_array_loop
+        hgt [r1], 0
+        write_state_byte_array_done:
+        lwso [r0], [fp], -1w
+        j [r0]
         halt
 
 
@@ -162,14 +172,11 @@ stdlib_lines = list(filter(None, textwrap.dedent("""
         write_int_pos:
         hlt [r2], 0
 
-        ; Special-casing 0 produces a nicer loop structure
-        j write_int_get_digits
-        hne [r2], 0
-        yield '0'
-        j write_return
-
+        j write_int_get_digits_body
+        halt
         write_int_get_digits:
         heq [r2], 0
+        write_int_get_digits_body:
             mod [r1], [r2], 10
             div [r2], [r2], 10
             write_int_push:
@@ -182,5 +189,7 @@ stdlib_lines = list(filter(None, textwrap.dedent("""
         sub [r1], [fp], [r0]
         sub [r1], [r1], 1w
         j write_state_byte_array_loop
+        hgt [r1], 0
+        j write_state_byte_array_done
         halt
 """).strip('\n').encode('utf-8').split(b'\n')))

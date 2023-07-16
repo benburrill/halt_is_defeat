@@ -70,8 +70,8 @@ Running under ``spasm`` produces the expected output:
     Hello world!
     Some numbers: 1 2 3 4 5 6 7 8 9 10
     Reached win flag
-        CPU time: 633 clock cycles
-        Emulator efficiency: 45.61%
+        CPU time: 578 clock cycles
+        Emulator efficiency: 48.78%
 
 If you run it yourself, you may notice something a little odd.  Once the
 end of the program is reached, it gets stuck in an infinite loop.
@@ -126,10 +126,8 @@ Output:
     try block
     stop block
     Reached win flag
-        CPU time: 170 clock cycles
-        Emulator efficiency: 36.80%
-
-
+        CPU time: 151 clock cycles
+        Emulator efficiency: 43.14%
 
 Note that defeat's utility as a replacement for exceptions is limited.
 There is only one form of defeat, and try blocks can ONLY be used within
@@ -167,8 +165,8 @@ Output:
     $ spasm undo.s
     undo block
     Reached win flag
-        CPU time: 87 clock cycles
-        Emulator efficiency: 30.85%
+        CPU time: 78 clock cycles
+        Emulator efficiency: 41.94%
 
 
 Halting problems
@@ -255,8 +253,8 @@ The ``preempt`` block containing the return will run if not doing so
 would lead to defeat.  If no larger value will be found, the ``preempt``
 block needs to be run, since otherwise we'd be heading to defeat at the
 end of the loop.  However, if there's a larger value in the future, the
-``preempt`` block is not run -- a return would need to occur in the
-future, so we are safe from defeat.
+``preempt`` block is not run -- a return will need to occur in the
+future, so we are safe from defeat in the present.
 
 In this code, ``preempt`` is doing most of the work.  The ``try/undo``
 is mostly serving just to set up an arena for ``preempt`` to be used,
@@ -266,7 +264,7 @@ If you want to test it out, the full program can be found in
 `<examples/max.hid>`_, and takes command-line arguments so you can
 easily play around with different inputs.
 
-*What time-traveling algorithms can you come up with?*
+*What time-traveling algorithms can YOU come up with?*
 
 Other features
 ==============
@@ -492,11 +490,11 @@ Types and special coercion rules of literals:
 Explicit type casts may be performed with ``is``, eg ``baba is byte``.
 
 Allowed explicit type casts:
- * (``byte`` | ``bool``) ``is int``
- * (``int`` | ``bool``) ``is byte``
- * (``int`` | ``byte`` | ``string`` | ``T[]``) ``is bool`` (arrays and
-   strings are truthy if they have non-zero length)
- * (``string``) ``is byte[]`` (result is ``const byte[]``)
+ * (byte | bool) ``is int``
+ * (int | bool) ``is byte``
+ * (int | byte | string | array) ``is bool`` (strings and arrays are
+   truthy if they have non-zero length)
+ * (string) ``is byte[]`` (result is ``const byte[]``)
  * (array literal) ``is T[]`` (valid if all entries in the array literal
    can be cast to ``T``, and retains the ``const`` flexibility of array
    literals).
@@ -514,7 +512,7 @@ represent a code path that could lead to defeat).
 Defeat functions (prefixed by ``!``) can cause defeat.  They may call
 other defeat functions, just as you can in a ``try`` block.  However,
 ``preempt`` can only be used directly within ``try`` blocks, not defeat
-functions, as it would otherwise break modularity in confusing ways.
+functions, as it would break modularity.
 
 Ordinary functions (no prefix) cannot call either you functions or
 defeat functions, but may be called from anywhere.
