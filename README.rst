@@ -507,6 +507,9 @@ You functions (prefixed by ``@``) have special calling restrictions to
 ensure a return path that will never reach defeat.  This invariant is
 what allows ``try`` blocks and speculation to be used in a modular and
 consistent way, so these may only be used within you-functions.
+To maintain this, you-functions can *only* be called directly from
+within other you-functions (and not within ``try`` blocks since those
+represent a code path that could lead to defeat).
 
 Defeat functions (prefixed by ``!``) can cause defeat.  They may call
 other defeat functions, just as you can in a ``try`` block.  However,
