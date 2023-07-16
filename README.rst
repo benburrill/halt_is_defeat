@@ -478,7 +478,7 @@ be reassigned.
 Types and special coercion rules of literals:
  * Numeric literals: ``5``, ``0xFF``, ``1_000`` - Type: ``int``, but coercible to ``byte``
  * Byte/"character" literals: ``'a'``, ``'\n'`` - Type: ``byte``
- * String literals: "Hello \u{1F30E}" - Type: ``string``
+ * String literals: ``"Hello \u{1F30E}"`` - Type: ``string``
  * Boolean literals: ``true`` or ``false`` - Type: ``bool``
  * Array literals: ``[1, 2, f(x)]`` - Type: array of the first type all
    entries can be coerced to, but is coercible to any type all entries
