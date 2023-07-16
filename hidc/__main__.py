@@ -36,12 +36,17 @@ hidc.add_argument(
 )
 
 hidc.add_argument(
-    '--dump-ast', help='output typechecked AST rather than compiling',
+    '--unchecked', help='disable all runtime checks',
     action='store_true'
 )
 
 hidc.add_argument(
-    '--unchecked', help='disable all runtime checks',
+    '--lint', help='enable linting errors',
+    action='store_true'
+)
+
+hidc.add_argument(
+    '--dump-ast', help='output typechecked AST rather than compiling',
     action='store_true'
 )
 
@@ -59,7 +64,7 @@ def main():
         return 1
 
     try:
-        env = Environment.empty()
+        env = Environment.empty(unreachable_error=args.lint)
         ast = parse(source).evaluate(env)
 
         if args.dump_ast:
