@@ -80,6 +80,12 @@ interrupt (ctrl-c) to forcibly stop the running program.  Attempting to
 stop programs running on a real Sphinx processor is not recommended and
 may destroy the universe.
 
+Upon reaching the ``win`` flag, the ``spasm`` emulator also produces
+some statistics.  The CPU time is the number of Sphinx instructions
+executed (each instruction takes 1 clock cycle).  The emulator
+efficiency is an implementation detail of the emulator and may be
+ignored.
+
 A taste of defeat
 -----------------
 Defeat functions have names starting with ``!``, and may result in
