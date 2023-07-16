@@ -492,12 +492,12 @@ Explicit type casts may be performed with ``is``, eg ``baba is byte``.
 Allowed explicit type casts:
  * (byte | bool) ``is int``
  * (int | bool) ``is byte``
- * (int | byte | string | array) ``is bool`` (strings and arrays are
-   truthy if they have non-zero length)
- * (string) ``is byte[]`` (result is ``const byte[]``)
- * (array literal) ``is T[]`` (valid if all entries in the array literal
-   can be cast to ``T``, and retains the ``const`` flexibility of array
-   literals).
+ * (int | byte | string | array) ``is bool`` - strings and arrays are
+   truthy if they have non-zero length
+ * (string) ``is byte[]`` - result is ``const byte[]``
+ * (array literal) ``is T[]`` - valid if all entries in the array
+   literal can be cast to ``T``, and retains the ``const`` flexibility
+   of array literals.
 
 Blocks and functions
 --------------------
