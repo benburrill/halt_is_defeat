@@ -372,6 +372,21 @@ def test_block():
 
     with raises(ParserError): assert parse_string('{int x = 0}', ps_block(ctx))
 
+def test_preemptive():
+    block = parse_string('{ {}; if (false) { preempt {} }; {} }', ps_block(dctx))
+    assert block.preemptive
+    assert not block.stmts[0].preemptive
+    assert block.stmts[1].preemptive
+    assert block.stmts[1].body.preemptive
+    assert block.stmts[1].body.stmts[0].preemptive
+    assert not block.stmts[1].body.stmts[0].body.preemptive
+    assert not block.stmts[2].preemptive
+
+    block2 = parse_string('{ try { preempt {} } undo {} }', ps_block(yctx))
+    assert not block2.preemptive
+    assert not block2.stmts[0].preemptive
+    assert block2.stmts[0].body.preemptive
+
 def test_program():
     assert parse_string('// Nothing here', ps_program()) == Program((), ())
     assert parse_string(';', ps_program()) == Program((), ())

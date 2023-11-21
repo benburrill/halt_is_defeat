@@ -4,6 +4,7 @@ from .statements import ReturnStatement, BreakStatement, ContinueStatement
 from .symbols import DataType, Ident, Flavor
 from hidc.lexer import Span, Cursor
 from hidc.errors import TypeCheckError, InternalCompilerError
+from hidc.utils.data_abc import Abstract
 
 import dataclasses as dc
 from collections.abc import Sequence
@@ -27,16 +28,25 @@ class Block(Statement):
     def exit_modes(self):
         pass
 
+    preemptive: Abstract[bool]
+
 
 @dc.dataclass(frozen=True)
 class CodeBlock(Block):
     stmts: Sequence[Statement]
     span: Span
+    # I can't be bothered to change the tests, so I'm setting a default
+    # value of False for preemptive and making it compare=False.
+    # However, evaluate is NOT responsible for setting preemptive (since
+    # we want it to be affected even by unreachable code), so whenever a
+    # CodeBlock is constructed for realsies, preemptive should always be
+    # passed.
+    preemptive: bool = dc.field(default=False, compare=False)
     _exit_mode: ExitMode = dc.field(default=None, compare=False)
 
     @classmethod
     def empty(cls, cursor):
-        return cls((), Span(cursor, cursor))
+        return cls((), Span(cursor, cursor), preemptive=False)
 
     def evaluate(self, env):
         new_env = env.new_child()
@@ -74,7 +84,7 @@ class CodeBlock(Block):
                 case ContinueStatement():
                     found_continue = True
 
-        return CodeBlock(tuple(new_stmts), self.span, mode)
+        return CodeBlock(tuple(new_stmts), self.span, self.preemptive, mode)
 
     def exit_modes(self):
         if self._exit_mode is None:
@@ -109,9 +119,9 @@ class LoopBlock(ControlBlock):
         return CodeBlock((
             *((init,) if init else ()),
             cls(start, body, cond or BoolValue(True, start),
-                CodeBlock((cont,), cont.span) if cont
+                CodeBlock((cont,), cont.span, preemptive=False) if cont
                 else CodeBlock.empty(start))
-        ), Span(start, body.span.end))
+        ), Span(start, body.span.end), preemptive=False)
 
     def evaluate(self, env):
         return LoopBlock(
@@ -132,6 +142,10 @@ class LoopBlock(ControlBlock):
         # even if there's a return, the loop might not get run at all.
         return mode.replace(ExitMode.BREAK, ExitMode.NONE)
 
+    @property
+    def preemptive(self):
+        return self.body.preemptive
+
 
 @dc.dataclass(frozen=True)
 class IfBlock(ControlBlock):
@@ -148,11 +162,19 @@ class IfBlock(ControlBlock):
     def exit_modes(self):
         return self.body.exit_modes() | self.else_block.exit_modes()
 
+    @property
+    def preemptive(self):
+        return self.body.preemptive or self.else_block.preemptive
+
 
 @dc.dataclass(frozen=True)
 class UndoBlock(ControlBlock):
     def exit_modes(self):
         return self.body.exit_modes()
+
+    @property
+    def preemptive(self):
+        return self.body.preemptive
 
 
 @dc.dataclass(frozen=True)
@@ -160,9 +182,14 @@ class StopBlock(ControlBlock):
     def exit_modes(self):
         return self.body.exit_modes()
 
+    @property
+    def preemptive(self):
+        return self.body.preemptive
+
 
 @dc.dataclass(frozen=True)
 class PreemptBlock(ControlBlock):
+    preemptive = True
     def exit_modes(self):
         # The preempt block may be skipped
         return self.body.exit_modes() | ExitMode.NONE
@@ -171,6 +198,7 @@ class PreemptBlock(ControlBlock):
 @dc.dataclass(frozen=True)
 class TryBlock(ControlBlock):
     handler: UndoBlock | StopBlock
+    preemptive = False
 
     def evaluate(self, env):
         return TryBlock(

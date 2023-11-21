@@ -238,16 +238,19 @@ async def ps_stmt(ctx):
 async def ps_code_block(ctx):
     if start := await Exact(BracToken.LCURLY):
         result = []
+        preemptive = False
         while not (end := await Exact(BracToken.RCURLY)):
             if stmt := await ps_stmt(ctx):
                 await expect(Exact(SepToken.SEMICOLON))
                 result.append(stmt)
             elif not await Exact(SepToken.SEMICOLON):
-                result.append(await expect(
+                block = await expect(
                     ps_block(ctx), expected='statement or block'
-                ))
+                )
+                preemptive |= block.preemptive
+                result.append(block)
 
-        return CodeBlock(tuple(result), start.span | end.span)
+        return CodeBlock(tuple(result), start.span | end.span, preemptive)
 
 
 @Parser.routine('block statement')
@@ -282,15 +285,15 @@ async def ps_block(ctx):
         return LoopBlock.for_loop(start, body, init, cond, cont)
     elif await Exact(BlockToken.TRY):
         if BlockContext.YOU not in ctx:
-            raise ParserError('try outside of you', start)
+            raise ParserError('try outside of you context', start)
         body = await expect(ps_block((ctx & ~BlockContext.YOU) | BlockContext.TRY))
         handler_blocks = {BlockToken.UNDO: UndoBlock, BlockToken.STOP: StopBlock}
         lxm = await expect(OneOf(handler_blocks))
         handler = handler_blocks[lxm.token](lxm.span.start, await expect(ps_block(ctx)))
         return TryBlock(start, body, handler)
     elif await Exact(BlockToken.PREEMPT):
-        if BlockContext.TRY not in ctx:
-            raise ParserError('preempt outside of try', start)
+        if BlockContext.DEFEAT not in ctx:
+            raise ParserError('preempt outside of defeat context', start)
         return PreemptBlock(start, await expect(ps_block(ctx)))
     return await ps_code_block(ctx)
 

@@ -1,0 +1,89 @@
+// Time-traveling mergesort.  Sort only the parts of the array that need
+// to be sorted, skipping over everything else entirely.
+// Pass the input array of integers as command-line arguments.
+
+empty @sort(int[] arr) {
+    try {
+        !sorted_is_defeat(arr, 0, arr.length);
+    } undo {}
+}
+
+empty !sorted_is_defeat(int[] arr, int start, int end) {
+    !truth_is_defeat(end - start <= 1);
+    int mid = (start + end) / 2;
+
+    // Skip over the left and right sides if they are already sorted.
+    bool skip_left = false;
+    preempt { skip_left = true; }
+    if (not skip_left) {
+        !sorted_is_defeat(arr, start, mid);
+    }
+
+    bool skip_right = false;
+    preempt { skip_right = true; }
+    if (not skip_right) {
+        !sorted_is_defeat(arr, mid, end);
+    }
+
+    if (skip_left and skip_right) {
+        // Sort is defeat if array was already sorted:
+        // If left and right side were already sorted, then it's defeat
+        // if the two sides are in order.
+        !truth_is_defeat(arr[mid - 1] <= arr[mid]);
+    }
+
+    !merge(arr, start, mid, end);
+}
+
+// !merge() should never cause defeat, but it is implemented as a defeat
+// function in order to use preempt and be used by !sorted_is_defeat().
+// TODO: Try to make better use of preempt here, it's not doing much
+empty !merge(int[] arr, int left, int right, int end) {
+    int scratch[end - left];
+    int size = 0;
+    int li = left;
+    int ri = right;
+    while (li < right) {
+        preempt { break; }
+        if (ri < end and arr[ri] < arr[li]) {
+            scratch[size] = arr[ri];
+            ri += 1;
+        } else {
+            scratch[size] = arr[li];
+            li += 1;
+        }
+        size += 1;
+    }
+
+    bool unnecessary_copy = false;
+    for (int i = 0; i < size; i += 1) {
+        unnecessary_copy = arr[left + i] == scratch[i];
+        arr[left + i] = scratch[i];
+    }
+
+    // The last copy we do should be necessary
+    !truth_is_defeat(unnecessary_copy);
+}
+
+////////////////////////////////////////////////////////////////////////
+
+empty write_array(const int[] arr) {
+    write('[');
+    for (int i = 0; i < arr.length; i += 1) {
+        if (i != 0) {
+            write(", ");
+        }
+        write(arr[i]);
+    }
+    write(']');
+}
+
+empty @is_you(int[] arr) {
+    write("Before: ");
+    write_array(arr);
+    writeln();
+    @sort(arr);
+    write("After:  ");
+    write_array(arr);
+    writeln();
+}

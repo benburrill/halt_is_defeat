@@ -175,6 +175,7 @@ class CodeGen:
     effective_defeat: asm.AssemblyExpression                   = dc.field(init=False, default=stdlib.halt)
     func_defeat: asm.AssemblyExpression                        = dc.field(init=False, default=stdlib.halt)
     needs_variable_defeat: bool                                = dc.field(init=False, default=False)
+    needs_return_protection: bool                              = dc.field(init=False, default=False)
 
     argv_specs: list[bytes]                                    = dc.field(init=False, default_factory=list)
     entry_args: list[asm.Directive]                            = dc.field(init=False, default_factory=list)
@@ -336,6 +337,10 @@ class CodeGen:
         else:
             self.func_defeat = stdlib.halt
         self.effective_defeat = self.func_defeat
+
+        self.needs_return_protection = not self.unchecked and func.body.preemptive
+        if self.needs_return_protection:
+            assert csig.name.flavor == ast.Flavor.DEFEAT
 
         # Reserve space for RA and passed arguments
         bubble = self.reserve_word()
@@ -536,6 +541,9 @@ class CodeGen:
                         yield asm.Mov(self.defeat, self.func_defeat)
                     # Deallocate all arrays currently in scope
                     yield from self.reset_ap(0)
+                    # Runtime protection for preemptive defeat functions
+                    if self.needs_return_protection:
+                        yield asm.Jump(stdlib.nonlocal_preempt)
                     # Jump to return address
                     yield from self.goto(ra)
                     return True, var_bubble

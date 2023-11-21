@@ -12,7 +12,7 @@ Key features of Halt is Defeat:
  * Function overloading
  * Stack-allocated variable-length arrays
  * Type coercion and inference of ambiguous expressions
- * P = NP
+ * Solve any NP problem in polynomial time
 
 Quick start guide
 =================
@@ -27,11 +27,11 @@ Alternatively, you may install the ``hidc`` executable:
     $ pip3 install --editable .
     $ hidc examples/hello.hid -o hello.s
 
-The ``hidc`` compiler currently has a single backend, targeting the
-Sphinx instruction set architecture.  As of this writing, Sphinx
-processors are not yet commercially available, though you may build one
-yourself from scratch on a breadboard using flux capacitors and other
-off-the-shelf components.
+The ``hidc`` compiler has a single backend, targeting the Sphinx
+instruction set architecture.  As of this writing, Sphinx processors are
+not yet commercially available, though you may build one yourself from
+scratch on a breadboard using flux capacitors and other off-the-shelf
+components.
 
 However, the simplest way to run the generated Sphinx assembly code is
 under the Sphinx emulator, ``spasm``.  The ``spasm`` emulator is
@@ -168,6 +168,7 @@ Output:
         CPU time: 78 clock cycles
         Emulator efficiency: 41.94%
 
+The try block is skipped entirely!
 
 Halting problems
 ----------------
@@ -287,7 +288,7 @@ There are two ways to create a new array.  Array literals, such as
 variable ``baba`` like ``int[] baba = [1, 2, f(x)];`` (or
 ``const int[] baba = [1, 2, f(x)];``).
 Array initializers are a special syntax for creating uninitialized array
-variables of arbitrary length: ``int baba[f(x)];``
+variables of arbitrary length: ``int baba[keke];``
 
 When passed to functions, a non-const array may be coerced into a const
 array, but not vice-versa.  This means that unless you intend on
@@ -322,6 +323,57 @@ evaluated, the right side will be evaluated first.
 Just like ``try``, speculation can only be used by you.
 Additionally, the operands of ``??`` must be ordinary expressions --
 neither you-functions nor defeat-functions may be used.
+
+Preemption in defeat functions
+------------------------------
+The ``preempt`` block is inherently nonlocal, but usually we want at
+least SOME locality when using it.  When ``preempt`` is used directly
+within a try block, the locality is provided by the try block.  However,
+when used within a defeat function, the intuitive behavior is for it to
+be local to the function's scope rather than to the parent try block, as
+that would break function modularity.
+
+Since Sphinx provides us with only a single "channel" of defeat, we
+cannot distinguish between defeat that occurs locally within the
+function we are in and defeat that is caused by our caller (which could
+also be a defeat function).  For this reason, Halt is Defeat was
+originally designed with the idea that preempt would never be allowed
+inside of defeat functions.
+
+However, having preempt in defeat functions is very useful for writing
+recursive time-traveling algorithms
+(such as `<examples/mergesort.hid>`_).
+These sorts of functions require their caller to guarantee safety from
+defeat in order to work correctly, but they pass along this safety to
+their recursive calls.
+
+The problem still remains that we can't really guarantee at compile time
+that preemptive defeat functions are being provided appropriate safety.
+Halt is Defeat conservatively requires that all defeat functions with a
+preempt block in them (even if the preempt block is totally unreachable)
+must always be guaranteed safety.  Unless disabled with ``--unchecked``,
+Halt is Defeat will check at runtime to ensure that safety is provided
+to such functions at the return boundary, producing a fatal runtime
+error if it is not.
+
+This means that the following code will produce an error:
+
+.. code::
+
+    empty !baba() {
+        if (false) { preempt {} }
+    }
+
+    empty @is_you() {
+        try {
+            !baba();
+            !is_defeat();
+        } undo {}
+    }
+
+However, if either the defeat or the preempt is removed, or if the
+function is inlined, or if the code is run with ``--unchecked``, there
+will be no error.
 
 Command-line arguments
 ----------------------
@@ -421,6 +473,7 @@ checked operations become undefined behavior:
 - Division or modulo by 0
 - Indexing an array or string out of bounds
 - Stack overflow
+- Calling a preemptive defeat function without providing safety
 
 Be aware that HiD's nasal demons can time travel, so undefined behavior
 may result in a program's defeat before it even starts, etc.
@@ -510,9 +563,13 @@ within other you-functions (and not within ``try`` blocks since those
 represent a code path that could lead to defeat).
 
 Defeat functions (prefixed by ``!``) can cause defeat.  They may call
-other defeat functions, just as you can in a ``try`` block.  However,
-``preempt`` can only be used directly within ``try`` blocks, not defeat
-functions, as it would break modularity.
+other defeat functions, just as you can in a ``try`` block.  Defeat
+functions can also have ``preempt`` blocks.  A defeat function which
+contains a preempt block anywhere in it (even if unreachable) is called
+a "preemptive defeat function".  The caller of a preemptive defeat
+function must guarantee safety (for example, by wrapping the call to the
+function in a try/undo block).  It is a runtime error if safety is not
+provided.
 
 Ordinary functions (no prefix) cannot call either you functions or
 defeat functions, but may be called from anywhere.
@@ -538,6 +595,7 @@ You functions:
 Defeat functions:
  * Function calls: ordinary functions, defeat functions
  * Conventional control blocks (``while``, ``if``, etc)
+ * ``preempt`` blocks
 Ordinary functions:
  * Function calls: ordinary functions
  * Conventional control blocks (``while``, ``if``, etc)

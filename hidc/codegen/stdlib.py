@@ -10,6 +10,7 @@ all_is_broken = asm.LabelRef('all_is_broken')
 out_of_bounds = asm.LabelRef('out_of_bounds')
 stack_overflow = asm.LabelRef('stack_overflow')
 division_by_zero = asm.LabelRef('division_by_zero')
+nonlocal_preempt = asm.LabelRef('nonlocal_preempt')
 halt = asm.LabelRef('halt')
 
 # NOTE:
@@ -76,6 +77,10 @@ stdlib_lines = list(filter(None, textwrap.dedent("""
         halt
     out_of_bounds:
         flag out_of_bounds
+        j all_is_broken
+        halt
+    nonlocal_preempt:
+        flag nonlocal_preempt
         j all_is_broken
         halt
 

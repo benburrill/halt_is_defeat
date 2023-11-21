@@ -55,7 +55,8 @@ class FuncDeclaration(FuncDefinition):
                 raise TypeCheckError('Missing return statement', self.body.span)
             body = CodeBlock(
                 body.stmts + (ReturnStatement(body.span.end),),
-                body.span, exit_modes.replace(ExitMode.NONE, ExitMode.RETURN)
+                body.span, body.preemptive,
+                exit_modes.replace(ExitMode.NONE, ExitMode.RETURN)
             )
 
 
