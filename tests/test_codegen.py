@@ -14,6 +14,7 @@ class RecorderContext(ExecutionContext):
     def __init__(self):
         super().__init__()
         self.reset()
+        self.vctx = VirtualContext()
 
     def reset(self):
         self.flags = []
@@ -29,19 +30,21 @@ class RecorderContext(ExecutionContext):
     def on_flag(self, prog, flag):
         self.flags.append(flag)
 
+    def virtualize(self):
+        return self.vctx
+
 def make_emulator(lines, args=()):
     ps = SphinxParser(args)
     ps.parse_lines(lines)
     return Emulator(
         ps.get_program(),
-        vctx=VirtualContext(),
-        rctx=RecorderContext()
+        ctx=RecorderContext()
     )
 
 def run_to_flag(emulator, max_cycles=10000):
-    initial_flags = len(emulator.rctx.flags)
+    initial_flags = len(emulator.ctx.flags)
     for _ in range(max_cycles):
-        if len(emulator.rctx.flags) != initial_flags:
+        if len(emulator.ctx.flags) != initial_flags:
             return emulator
         if not emulator.step():
             return emulator
@@ -69,8 +72,8 @@ def test_basic():
         b'halt'
     ], ['3']))
 
-    assert emulator.rctx.flags == ['win']
-    assert list(emulator.rctx.bytes) == [3, 2, 1, 0]
+    assert emulator.ctx.flags == ['win']
+    assert list(emulator.ctx.bytes) == [3, 2, 1, 0]
 
 def test_hello():
     prog = compile("""
@@ -80,8 +83,8 @@ def test_hello():
     """)
 
     emulator = run_to_flag(make_emulator(prog))
-    assert emulator.rctx.flags == ['win']
-    assert bytes(emulator.rctx.bytes) == b'Hello world!\n'
+    assert emulator.ctx.flags == ['win']
+    assert bytes(emulator.ctx.bytes) == b'Hello world!\n'
 
 def test_ints():
     prog = compile("""
@@ -95,8 +98,8 @@ def test_ints():
     """)
 
     emulator = run_to_flag(make_emulator(prog))
-    assert emulator.rctx.flags == ['win']
-    assert bytes(emulator.rctx.bytes).splitlines(keepends=True) == [
+    assert emulator.ctx.flags == ['win']
+    assert bytes(emulator.ctx.bytes).splitlines(keepends=True) == [
         b'0\n',
         b'1\n',
         b'-1\n',
