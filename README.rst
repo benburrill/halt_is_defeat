@@ -110,10 +110,10 @@ and the ``stop`` block is run:
 
     empty @is_you() {
         try {
-            writeln("try block");
+            writeln("> try block");
             !is_defeat();
         } stop {
-            writeln("stop block");
+            writeln("> stop block");
         }
     }
 
@@ -123,11 +123,11 @@ Output:
 
     $ hidc stop.hid -o stop.s
     $ spasm stop.s
-    try block
-    stop block
+    > try block
+    > stop block
     Reached win flag
-        CPU time: 151 clock cycles
-        Emulator efficiency: 43.14%
+        CPU time: 175 clock cycles
+        Emulator efficiency: 43.32%
 
 Note that defeat's utility as a replacement for exceptions is limited.
 There is only one form of defeat, and try blocks can ONLY be used within
@@ -150,10 +150,10 @@ defeat:
 
     empty @is_you() {
         try {
-            writeln("try block");
+            writeln("> try block");
             !is_defeat();
         } undo {
-            writeln("undo block");
+            writeln("> undo block");
         }
     }
 
@@ -163,10 +163,10 @@ Output:
 
     $ hidc undo.hid -o undo.s
     $ spasm undo.s
-    undo block
+    > undo block
     Reached win flag
-        CPU time: 78 clock cycles
-        Emulator efficiency: 41.94%
+        CPU time: 90 clock cycles
+        Emulator efficiency: 42.06%
 
 The try block is skipped entirely!
 
@@ -324,8 +324,8 @@ Just like ``try``, speculation can only be used by you.
 Additionally, the operands of ``??`` must be ordinary expressions --
 neither you-functions nor defeat-functions may be used.
 
-Preemption in defeat functions
-------------------------------
+Preemptive defeat functions
+---------------------------
 The ``preempt`` block is inherently nonlocal, but usually we want at
 least SOME locality when using it.  When ``preempt`` is used directly
 within a try block, the locality is provided by the try block.  However,
