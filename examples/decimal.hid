@@ -1,0 +1,129 @@
+// Outputs a decimal expansion of a fraction, with repeating portion in
+// parentheses, without any redundant digits.
+// I recommend compiling with either -m24 or -m32 so you can use large
+// fractions.  Otherwise, the code may output garbage for fractions with
+// denominators larger than ~1/10th the max int for the word size.
+// You must pass command-line arguments: spasm decimal.s <num> <den>
+// Example:
+//   $ hidc -m24 examples/decimal.hid -o decimal.s
+//   $ spasm decimal.s 271801 99990
+//   271801 / 99990 = 2.7(1828)
+
+// Some more fractions to try: 84823/27000, 511/1024, 511/1021, 1/308927
+
+// Two implementations of the same algorithm are included:
+// @write_expansion_simple and @write_expansion_clever
+// @write_expansion_simple is objectively better in every way.  It is
+// shorter, simpler, more intuitive, and compiles to faster code.
+//
+// @write_expansion_clever makes interesting use of try/stop in a way I
+// think is kinda elegant, and which lets it avoid some code duplication
+// (though it still ends up being longer).  It is also more similar to
+// the way I implemented it in Sphinx assembly:
+// https://github.com/benburrill/sphinx/blob/main/examples/decimal.s
+
+
+empty @write_expansion_simple(int num, int den) {
+    if (den < 0) {
+        num = -num;
+        den = -den;
+    }
+
+    if (num < 0) {
+        write('-');
+        num = -num;
+    }
+
+    write(num / den);
+    num %= den;
+    if (not num) { return; }
+    write('.');
+
+    while (num) {
+        try {
+            int prev = num;
+            int fast = num;
+            write('(');
+            while (true) {
+                num *= 10;
+                write(('0' + (num / den)) is byte);
+                num %= den;
+
+                if (num == prev) {
+                    write(')');
+                    return;
+                }
+
+                fast *= 10;
+                fast %= den;
+                fast *= 10;
+                fast %= den;
+                !truth_is_defeat(num == fast);
+            }
+        } undo {
+            num *= 10;
+            write(('0' + (num / den)) is byte);
+            num %= den;
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////
+// An alternative implementation using try/stop
+
+empty @write_expansion_clever(int num, int den) {
+    if (den < 0) {
+        num = -num;
+        den = -den;
+    }
+
+    if (num < 0) {
+        write('-');
+        num = -num;
+    }
+
+    write(num / den);
+    num %= den;
+    if (not num) { return; }
+    write('.');
+
+    while (num) {
+        try {
+            int prev = num;
+            int fast = num;
+
+            bool repeat_starts_here = true;
+            preempt { repeat_starts_here = false; }
+            if (repeat_starts_here) {
+                write('(');
+            }
+
+            while (true) {
+                num *= 10;
+                write(('0' + (num / den)) is byte);
+                num %= den;
+                preempt { !is_defeat(); }  // Nihilistic defeatism
+
+                if (num == prev) {
+                    write(')');
+                    return;
+                }
+
+                fast *= 10;
+                fast %= den;
+                fast *= 10;
+                fast %= den;
+                !truth_is_defeat(fast == num);
+            }
+        } stop { }
+    }
+}
+
+empty @is_you(int num, int den) {
+    write(num);
+    write(" / ");
+    write(den);
+    write(" = ");
+    @write_expansion_simple(num, den);
+    writeln();
+}
