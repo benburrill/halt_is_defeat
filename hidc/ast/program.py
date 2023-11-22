@@ -86,7 +86,8 @@ builtin_stubs = (
     BuiltinStub(DataType.EMPTY, Ident('all_is_win'), ()),
     BuiltinStub(DataType.EMPTY, Ident('all_is_broken'), ()),
     BuiltinStub(DataType.EMPTY, Ident('sleep'), (DataType.INT,)),
-    BuiltinStub(DataType.EMPTY, Ident('debug'), ())
+    BuiltinStub(DataType.EMPTY, Ident('debug'), ()),
+    BuiltinStub(DataType.EMPTY, Ident('progress'), ())
 )
 
 

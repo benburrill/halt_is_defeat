@@ -888,6 +888,10 @@ class CodeGen:
                 assert not args
                 yield asm.Flag(asm.SpecialArg(b'debug'))
                 return self.reserve_type(DataType.EMPTY)
+            elif name == ast.Ident('progress'):
+                assert not args
+                yield asm.Flag(asm.SpecialArg(b'progress'))
+                return self.reserve_type(DataType.EMPTY)
             elif abstract_params not in stdlib.abstract_funcs.get(name, set()):
                 raise InternalCompilerError(f'Unimplemented stdlib function: {name}, {abstract_params}')
 

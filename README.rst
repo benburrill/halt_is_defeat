@@ -495,7 +495,8 @@ Standard library
 - ``empty all_is_win()`` - enter the win state, ending program execution and starting infinite loop
 - ``empty all_is_broken()`` - enter the error state, ending program execution and starting infinite loop
 - ``empty sleep(int millis)`` - sleep for the given number of milliseconds
-- ``empty debug()`` - emits debug flag, results are platform-dependent.  On ``spasm`` will dump memory to stdout.
+- ``empty debug()`` - emits debug flag, results are platform-dependent.  ``spasm`` will dump memory to stdout.
+- ``empty progress()`` - emits progress flag.  ``spasm`` will display elapsed time between progress flags.
 
 Operators
 ---------
