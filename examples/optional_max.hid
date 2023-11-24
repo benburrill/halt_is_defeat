@@ -1,7 +1,7 @@
 // This program demonstrates a technique for translating code written
 // with the hypothetical "optional" construct (as described in
-// https://github.com/benburrill/halt_is_defeat/issues/1) into
-// code using preemptive defeat functions.
+// https://github.com/benburrill/halt_is_defeat/issues/1) into code
+// using preemptive defeat functions.
 
 // Here's a recursive "optional"-based max (similar to max.hid):
 // int ?max(int max_val, const int[] arr, int start) {
