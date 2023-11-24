@@ -79,13 +79,9 @@ empty write_array(const int[] arr) {
 }
 
 empty @is_you(int[] arr) {
-    write("Before: ");
-    write_array(arr);
-    writeln();
-    progress(); // To show performance of @sort
     @sort(arr);
-    progress();
-    write("After:  ");
+    progress(); // To show time to run @sort
+    write("Sorted: ");
     write_array(arr);
     writeln();
 }
