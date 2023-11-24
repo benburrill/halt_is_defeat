@@ -1,0 +1,93 @@
+// This program demonstrates a technique for translating code written
+// with the hypothetical "optional" construct (as described in
+// https://github.com/benburrill/halt_is_defeat/issues/1) into
+// code using preemptive defeat functions.
+
+// Here's a recursive "optional"-based max (similar to max.hid):
+// int ?max(int max_val, const int[] arr, int start) {
+//     if (start < arr.length) {
+//         optional {
+//             int cur = arr[start];
+//             if (cur > max_val) {
+//                 max_val = cur;
+//                 required;
+//             }
+//             return ?max(max_val, arr, start + 1);
+//         }
+//     }
+//
+//     return max_val;
+// }
+
+// We need to split it into two separate functions due to the preempt
+// restrictions:
+
+// (Yes, there are other simpler ways you can write a time-traveling max
+// with recursive preemptive defeat functions, but the point here is to
+// demonstrate a general technique that may be useful when writing other
+// recursive functions in HiD)
+
+int unrequired_max(int max_val, const int[] arr, int start) {
+    // If we had ?-function calls outside of optional blocks, we would
+    // transform those into unrequired_* calls here, but this is a very
+    // simple case.
+
+    if (start < arr.length) { }  // Dead code, included for clarity
+    return max_val;
+}
+
+int !unrequired_max_is_defeat(int max_val, const int[] arr, int start) {
+    bool caller_required = false;
+    if (start < arr.length) {
+        bool required = true;
+        preempt { required = false; }
+        if (required) {
+            required = false;
+            int cur = arr[start];
+            if (cur > max_val) {
+                max_val = cur;
+                required = true;
+                caller_required = true;
+            }
+            int result = 0;
+            bool callee_required = true;
+            preempt { callee_required = false; }
+            if (callee_required) {
+                result = !unrequired_max_is_defeat(max_val, arr, start + 1);
+                required = true;
+                caller_required = true;
+            } else {
+                result = unrequired_max(max_val, arr, start + 1);
+            }
+            !truth_is_defeat(not required);
+            !truth_is_defeat(not caller_required);
+            return result;
+        }
+    }
+
+    !truth_is_defeat(not caller_required);
+    return max_val;
+}
+
+// Then we can create you-function helpers for calling it:
+
+int @max(int max_val, const int[] arr, int start) {
+    try {
+        return !unrequired_max_is_defeat(max_val, arr, start);
+    } undo {
+        return unrequired_max(max_val, arr, start);
+    }
+}
+
+int @max(const int[] arr) {
+    return @max(arr[0], arr, 1);
+}
+
+empty @is_you(int[] nums) {
+    if (nums) {
+        write("Max value: ");
+        writeln(@max(nums));
+    } else {
+        writeln("Empty array");
+    }
+}
