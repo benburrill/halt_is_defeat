@@ -796,30 +796,38 @@ class CodeGen:
             case ast.ArrayInitializer():
                 length_bubble = yield from self.push_expr(self.r0, expr.length)
                 length = yield from length_bubble.get_fast(self.r0)
+                if not self.unchecked and not expr.type.el_type.byte_sized:
+                    # The byte-sized case will get properly handled by
+                    # stack overflow check, but we need to deal with the
+                    # possibility of integer overflow in get_array_size
+                    # messing up the check.
+                    safe_length = self.add_label('safe_length')
+                    yield asm.Jump(safe_length)
+                    yield asm.Hleu(length, asm.IntLiteral(self.max_length(expr.type.el_type)))
+                    yield from self.goto(stdlib.stack_overflow)
+                    yield asm.Label(safe_length)
                 origin_bubble = self.reserve_word()
                 yield from origin_bubble.value.set(asm.State(self.ap))
                 size = yield from self.get_array_size(self.r0, expr.type.el_type, length)
                 yield asm.Metadata('Array allocation (ArrayInitializer)')
-                no_overflow = self.add_label('no_overflow')
-                yield asm.Jump(no_overflow)
-                yield asm.Sub(self.r1, asm.State(self.fp), asm.State(self.ap))
 
-                # Current static array size is already included in ap
-                cur_static_array = self.stack.static_array_size
-                yield asm.Sub(
-                    self.r1, asm.State(self.r1),
-                    self.checkpoints.add(self.stack.static_size).map(
-                        lambda max_size: max_size - cur_static_array
+                if not self.unchecked:
+                    no_overflow = self.add_label('no_overflow')
+                    yield asm.Jump(no_overflow)
+                    yield asm.Sub(self.r1, asm.State(self.fp), asm.State(self.ap))
+
+                    # Current static array size is already included in ap
+                    cur_static_array = self.stack.static_array_size
+                    yield asm.Sub(
+                        self.r1, asm.State(self.r1),
+                        self.checkpoints.add(self.stack.static_size).map(
+                            lambda max_size: max_size - cur_static_array
+                        )
                     )
-                )
 
-                # TODO: in the case of word-celled arrays, the length
-                #  might be bad, but the size would overflow and appear
-                #  fine.  Is it worth checking for that?
-                yield asm.Hgeu(asm.State(self.r1), size)
-                yield from self.goto(stdlib.stack_overflow)
-
-                yield asm.Label(no_overflow)
+                    yield asm.Hgeu(asm.State(self.r1), size)
+                    yield from self.goto(stdlib.stack_overflow)
+                    yield asm.Label(no_overflow)
 
 
                 yield asm.Add(self.ap, asm.State(self.ap), size)
@@ -968,7 +976,8 @@ class CodeGen:
                     return self.add_global_array(
                         const, el_type, label_prefix, length, asm.ZeroDirective(
                             asm.IntLiteral(self.array_size(el_type, length))
-                        )
+                        ),
+                        initializer.length.span
                     )
             case ast.ArrayLiteral():
                 # Using const=True relies on that we don't actually put
@@ -995,7 +1004,8 @@ class CodeGen:
 
                 return self.add_global_array(
                     const, initializer.type.el_type,
-                    label_prefix, len(values), directive
+                    label_prefix, len(values), directive,
+                    initializer.span
                 )
         # We treat it as a CodeGenError rather than an internal error if
         # we cannot evaluate the initializer at compile time, implying
@@ -1017,8 +1027,9 @@ class CodeGen:
             result[-1] |= b << bit
         return result
 
-    def add_global_array(self, const, el_type: DataType, label_prefix, length, directive):
-        length = min(length, self.max_length(el_type))
+    def add_global_array(self, const, el_type: DataType, label_prefix, length, directive, span):
+        if length > self.max_length(el_type):
+            raise CodeGenError(f'Array is too large (length: {length})', span)
         label = self.add_label(label_prefix)
         data_dict = self.const_data if const else self.state_data
         access = AccessMode.RC if const else AccessMode.RW
@@ -1431,7 +1442,7 @@ class CodeGen:
     def get_array_size(self, r_out: asm.LabelRef, data_type, length: asm.AssemblyExpression):
         assert isinstance(data_type, DataType)
         if isinstance(length, asm.IntLiteral):
-            return asm.IntLiteral(self.array_size(data_type, length.data))
+            return asm.IntLiteral(self.array_size(data_type, length.data) & self.max_unsigned)
         if data_type == DataType.BOOL:
             yield asm.Add(r_out, length, asm.IntLiteral(7))
             yield asm.Asr(r_out, asm.State(r_out), asm.IntLiteral(3))

@@ -326,8 +326,10 @@ neither you-functions nor defeat-functions may be used.
 
 Preemptive defeat functions
 ---------------------------
+You can use ``preempt`` in defeat functions, but with some restrictions.
+
 The ``preempt`` block is inherently nonlocal, but usually we want at
-least SOME locality when using it.  When ``preempt`` is used directly
+least *some* locality when using it.  When ``preempt`` is used directly
 within a try block, the locality is provided by the try block.  However,
 when used within a defeat function, the intuitive behavior is for it to
 be local to the function's scope rather than to the parent try block, as
@@ -372,8 +374,8 @@ This means that the following code will produce an error:
     }
 
 However, if either the defeat or the preempt is removed, or if the
-function is inlined, or if the code is run with ``--unchecked``, there
-will be no error.
+function is inlined, or if the code is compiled with ``--unchecked``,
+there will be no error.
 
 Command-line arguments
 ----------------------
@@ -460,12 +462,10 @@ the causes of an error than if such errors caused defeat.
 
 Errors can also be produced in user code with ``all_is_broken()``.
 
-Although many operations in HiD are checked and will produce errors, the
-following are undefined behavior:
-
-- Accessing uninitialized strings in dynamically allocated arrays
-- Dynamically allocating an array with negative length (usually this
-  will produce a stack-overflow error, but not necessarily)
+Although many operations in HiD are checked and will produce runtime
+errors, there is some undefined behavior in the case of dynamically
+allocated arrays.  Dynamically allocated arrays are uninitialized, and
+the use of uninitialized strings is undefined behavior.
 
 Additionally, if the ``--unchecked`` flag is passed, all previously
 checked operations become undefined behavior:
@@ -473,6 +473,7 @@ checked operations become undefined behavior:
 - Division or modulo by 0
 - Indexing an array or string out of bounds
 - Stack overflow
+- Dynamically allocating an array with negative length
 - Calling a preemptive defeat function without providing safety
 
 Be aware that HiD's nasal demons can time travel, so undefined behavior
