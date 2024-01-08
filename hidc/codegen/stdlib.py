@@ -53,9 +53,6 @@ for _csig in stdlib_funcs:
 #  May need up to 4 words of stack space: 1 for RA + 3 for buffer.
 #  Also probably restructure write loops to make most jumps look only
 #  lookahead locally.
-#  Goal: hello world should have > 50% emulator efficiency.
-#  (currently it's more efficient to write a loop in HiD to write
-#  characters than to call write!)
 
 stdlib_lines = list(filter(None, textwrap.dedent("""
     all_is_win:

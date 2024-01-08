@@ -257,8 +257,17 @@ class FuncCall(Expression):
                         break
             else:
                 params = ', '.join(map(str, arg_sig))
+
+                help_msg = ''
+                if self.func.name in {'print', 'println'}:
+                    new_name = self.func.name.replace('print', 'write')
+                    # Only testing for exact type match here, but should
+                    # catch most misspellings.
+                    if arg_sig in env.funcs[Ident(new_name)]:
+                        help_msg = f' -- Did you mean {new_name}({params})?'
+
                 raise TypeCheckError(
-                    f'No matching function for signature {self.func}({params})',
+                    f'No matching function for signature {self.func}({params}){help_msg}',
                     self.span
                 ) from None
 
