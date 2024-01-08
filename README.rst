@@ -172,8 +172,7 @@ The try block is skipped entirely!
 
 Halting problems
 ----------------
-The ``undo`` block allows us to do some rather interesting things.  If
-we modify the above code by putting a loop before the ``!is_defeat()``,
+If we modify the above code by putting a loop before ``!is_defeat()``,
 the code will test if the loop will terminate, since defeat would never
 occur if the loop runs forever:
 
@@ -201,24 +200,36 @@ Output (it never reaches win because it is stuck in the loop):
 *Hold on a moment... the halting problem of Turing machines is
 undecidable, and HiD seems Turing-complete-ish, so what gives?*
 
-For more information on what's really going on here, see
-https://github.com/benburrill/sphinx, but to provide some small comfort
-that this isn't flagrantly impossible, Sphinx is not Turing complete.
-It is "Turing-complete-ish" (similar to how your computer is), but that
-only means its halting problem is generally intractable, not undecidable.
+Ignoring the question of *how* the try block knows "in advance" whether
+or not to run, there is nothing problematic about *what* it lets us do.
+Even though there is a difference from the perspective of the user,
+try/undo does not really let us test in isolation if some code is
+non-terminating any more so than try/stop does.
 
-Sphinx's entire execution is based around this.  The instruction set
-provides only a single jump instruction, the "Turing jump instruction",
-which performs a jump if not jumping would lead to halting.
+As for *how* it works, to provide some comfort that it isn't flagrantly
+impossible, Sphinx (HiD's compilation target) is **not** strictly Turing
+complete (no computer with finite memory is TC), so Sphinx's halting
+problem is not undecidable.  We are not solving the halting problem of
+Turing machines, only of Sphinx.  For more information on what's really
+going on here, see https://github.com/benburrill/sphinx.
 
+Sphinx's entire execution is dependent on its own halting problem.  The
+instruction set provides only a single jump instruction, the "Turing
+jump instruction", which performs a jump if not jumping would lead to
+halting.
+
+Another fun implementation detail is that because Sphinx has no other
+jump instructions, even ``if`` statements in Halt is Defeat must predict
+the future, and work by propagating future halts backwards through time.
+We've been solving Sphinx's halting problem since Hello World!
 
 Computational astrology
 -----------------------
 While the try/undo construct can be useful on its own, the most powerful
-and flexible tool in your temporal arsenal is ``preempt``.  It works a
-bit like an inside-out try.  The ``preempt`` block is run if not running
-the ``preempt`` block would lead to defeat.  It is used within ``try``
-blocks.
+and flexible tool in your temporal arsenal is ``preempt``.
+
+The ``preempt`` block is run if not running the ``preempt`` block would
+lead to defeat.  It is used within ``try`` blocks.
 
 Here we use the ``preempt`` block to write a function that finds the
 maximum value of an array, returning early as soon as this value is
@@ -453,12 +464,15 @@ safety from defeat similar to the ``win`` state.  As a result of this,
 the path of execution leading up to an error might not have actually
 occurred if the conditions that produced the error were fixed.
 
-For example, in a try/undo block you might have a path of execution
-which "should" lead to defeat, but instead causes a stack overflow.
-This could cause code to run which otherwise wouldn't if the stack size
-were increased, possibly printing "incorrect" output leading up to the
-error.  This can be confusing, but it is much more useful in debugging
-the causes of an error than if such errors caused defeat.
+For example, a try/undo block might have a stack overflow error which
+prevents the code from continuing on to reach a later defeat.  If the
+stack size were increased, the try block would have lead to defeat, and
+so the try block "shouldn't" have been run to begin with.  This could
+cause the printed output leading up to the error to seem "incorrect" or
+misleading if it is outputted under the assumption that defeat will be
+reached in the future.  This is actually very useful behavior for
+debugging, as it shows you under what condition the error actually
+occurs, but you need to be mindful of it.
 
 Errors can also be produced in user code with ``all_is_broken()``.
 
