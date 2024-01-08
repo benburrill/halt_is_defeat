@@ -491,7 +491,8 @@ checked operations become undefined behavior:
 - Calling a preemptive defeat function without providing safety
 
 Be aware that HiD's nasal demons can time travel, so undefined behavior
-may result in a program's defeat before it even starts, etc.
+can produce effects which are difficult to debug, such as killing the
+programmer's grandfather before they were born.
 
 Language reference
 ==================
