@@ -51,8 +51,6 @@ for _csig in stdlib_funcs:
 
 # TODO: test for stack overflow in write_int,
 #  May need up to 4 words of stack space: 1 for RA + 3 for buffer.
-#  Also probably restructure write loops to make most jumps look only
-#  lookahead locally.
 
 stdlib_lines = list(filter(None, textwrap.dedent("""
     all_is_win:
