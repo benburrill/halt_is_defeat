@@ -200,10 +200,10 @@ Output (it never reaches win because it is stuck in the loop):
 *Hold on a moment... the halting problem of Turing machines is
 undecidable, and HiD seems Turing-complete-ish, so what gives?*
 
-Ignoring the question of *how* the try block knows "in advance" whether
-or not to run, there is nothing problematic about *what* it lets us do.
-Even though there is a difference from the perspective of the user,
-try/undo does not really let us test in isolation if some code is
+If we ignore the question of *how* the try block can know "in advance"
+whether or not to run, there is nothing problematic about *what* it lets
+us do.  Even though there is a difference from the perspective of the
+user, try/undo does not really let us test in isolation if some code is
 non-terminating any more so than try/stop does.
 
 As for *how* it works, to provide some comfort that it isn't flagrantly

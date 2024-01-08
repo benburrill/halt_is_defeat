@@ -753,10 +753,14 @@ class CodeGen:
                     # TODO: clean this mess of a loop up
                     #  Also would be good to avoid the store and load in
                     #  more cases than just the first time.
+                    remaining_vals = iter(expr.values)
                     offset = -static_size
                     for byte in foundation:
                         prev = asm.IntLiteral(byte)
-                        for i, el_expr in zip(range(8), expr.values):
+                        # Python guarantees left-to-right evaluation
+                        # order for zip, so values won't be skipped so
+                        # long as we put range(8) first.
+                        for i, el_expr in zip(range(8), remaining_vals):
                             if not isinstance(el_expr, ast.BoolValue):
                                 if not isinstance(prev, asm.IntLiteral):
                                     yield asm.Sbso(asm.State(self.ap), asm.IntLiteral(offset), prev)
