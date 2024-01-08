@@ -210,8 +210,10 @@ As for *how* it works, to provide some comfort that it isn't flagrantly
 impossible, Sphinx (HiD's compilation target) is **not** strictly Turing
 complete (no computer with finite memory is TC), so Sphinx's halting
 problem is not undecidable.  We are not solving the halting problem of
-Turing machines, only of Sphinx.  For more information on what's really
-going on here, see https://github.com/benburrill/sphinx.
+Turing machines, only of Sphinx.
+
+For more information on what's really going on here, see
+https://github.com/benburrill/sphinx.
 
 Sphinx's entire execution is dependent on its own halting problem.  The
 instruction set provides only a single jump instruction, the "Turing
