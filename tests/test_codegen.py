@@ -32,6 +32,17 @@ empty write_arr(const int[] arr) {
     }
     write(']');
 }
+
+empty write_arr(const byte[] arr) {
+    write('[');
+    for (int i = 0; i < arr.length; i += 1) {
+        if (i != 0) { write(", "); }
+        write("0x");
+        write("0123456789ABCDEF"[(arr[i] / 0x10) % 0x10]);
+        write("0123456789ABCDEF"[arr[i] % 0x10]);
+    }
+    write(']');
+}
 """
 
 
@@ -130,6 +141,51 @@ def test_ints():
         b'-32768\n',
         b'-32768\n'
     ]
+
+def test_command_line_args():
+    emulator = make_emulator(compile(utils + """
+        empty @is_you(const string[] args) {
+            for (int i = 0; i < args.length; i += 1) {
+                write("> ");
+                writeln(args[i]);
+            }
+        }
+    """), ['Hello world', '', 'potato'])
+
+    assert run_to_flag(emulator, 'win') == (
+        b'> Hello world\n'
+        b'> \n'
+        b'> potato\n'
+    )
+
+def test_mixed_command_line():
+    emulator = make_emulator(compile(utils + """
+        empty @is_you(string s, byte b, int[] i) {
+            write(s);
+            writeln(b);
+            write_arr(i);
+        }
+    """), ['Hello', '33', '1', '2', '3', '4', '5'])
+
+    assert run_to_flag(emulator, 'win') == (
+        b'Hello!\n'
+        b'[1, 2, 3, 4, 5]'
+    )
+
+def test_entry_point_errors():
+    with raises(CodeGenError, match='Level is empty'):
+        compile("empty is_you() {}")
+    with raises(CodeGenError, match='must return empty'):
+        compile("int @is_you() { return 0; }")
+    with raises(CodeGenError, match='text on text is weak'):
+        compile("""
+            empty @is_you() {}
+            empty @is_you(const string[] args) {}
+        """)
+    with raises(CodeGenError, match='must be const'):
+        compile("empty @is_you(string[] args) {}")
+    with raises(CodeGenError, match='more than one array'):
+        compile("empty @is_you(const string[] a, int[] b) {}")
 
 @pytest.mark.parametrize('bools', [
     [],
@@ -447,4 +503,50 @@ def test_deallocate_vla():
         b'Start\n'
         b'Allocated and deallocated x\n'
         b'Allocated and deallocated y\n'
+    )
+
+def test_push_byte_to_int():
+    emulator = make_emulator(compile("""
+        empty f(int i) {
+            writeln(i);
+        }
+
+        empty @is_you() {
+            byte b = 0x42;
+            int i = 0x1111;
+            f(i);
+            f(b);
+        }
+    """))
+
+    assert run_to_flag(emulator, 'win') == b'4369\n66\n'
+
+def test_string_as_byte_array():
+    emulator = make_emulator(compile(utils + """
+        empty @is_you() {
+            string s = "Hello!";
+            write_arr(s);
+        }
+    """))
+
+    assert run_to_flag(emulator, 'win') == (
+        b'[0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x21]'
+    )
+
+def test_speculation():
+    emulator = make_emulator(compile("""
+        int f(int i) {
+            writeln(i);
+            return 42;
+        }
+
+        empty @is_you() {
+            writeln(f(0) ?? 41);
+            writeln(f(1) ?? 42);
+        }
+    """))
+
+    assert run_to_flag(emulator, 'win') == (
+        b'0\n42\n'
+        b'42\n'
     )
