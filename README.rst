@@ -7,8 +7,8 @@ the Sphinx ISA.
 
 Key features of Halt is Defeat:
  * Negative-cost abstractions with time-travel semantics
- * Memory safety through bounds checking and stack-overflow detection
- * Safety from defeat
+ * Guaranteed memory safety / bounds checking and stack-overflow detection
+ * Guaranteed safety from defeat
  * Function overloading
  * Stack-allocated variable-length arrays
  * Type coercion and inference of ambiguous expressions
