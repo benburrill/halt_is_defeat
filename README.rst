@@ -577,6 +577,25 @@ Allowed explicit type casts:
 
 Blocks and functions
 --------------------
+Control blocks can be followed by any other block, but not by line
+statements.  So ``preempt if (baba) { keke(); }`` is valid, but not
+``preempt keke();``.
+
+Try blocks
+..........
+``try`` blocks must have either a ``stop`` or ``undo`` handler.  The
+``stop`` handler is run if defeat is reached in the try block (similar
+to catch or except in other languages).  The ``undo`` block is run
+instead of the ``try`` block if running the try block *would have* lead
+to defeat.  ``try`` can only be used in a "you" context, and so cannot
+be nested.
+
+Regardless of handler, ``try`` blocks can contain any number of
+``preempt`` blocks.  The ``preempt`` block is run if not running the
+``preempt`` block would lead to defeat in its parent ``try`` block.
+
+Functions
+.........
 You functions (prefixed by ``@``) have special calling restrictions to
 ensure a return path that will never reach defeat.  This invariant is
 what allows ``try`` blocks and speculation to be used in a modular and
@@ -596,16 +615,6 @@ provided.
 
 Ordinary functions (no prefix) cannot call either you functions or
 defeat functions, but may be called from anywhere.
-
-``try`` blocks must have either a ``stop`` or ``undo`` handler.  The
-``stop`` handler is run if defeat is reached in the try block (similar
-to catch or except in other languages).  The ``undo`` block is run
-instead of the ``try`` block if running the try block *would have* lead
-to defeat.
-
-Regardless of handler, ``try`` blocks can contain any number of
-``preempt`` blocks.  The ``preempt`` block is run if not running the
-``preempt`` block would lead to defeat in its parent ``try`` block.
 
 Summary of what's allowed in different blocks
 .............................................
