@@ -518,7 +518,7 @@ def test_deallocate_vla():
         b'Allocated and deallocated y\n'
     )
 
-@pytest.mark.parametrize('cont', [0, 1])
+@pytest.mark.parametrize('cont', ['0', '1'])
 def test_loop_deallocate_array(cont):
     emulator = make_emulator(compile("""
         empty @is_you(int cont) {
@@ -681,3 +681,90 @@ def test_primality(n, expected):
     """), [str(n)])
 
     assert run_to_flag(emulator, 'win') == expected
+
+def test_globals():
+    emulator = make_emulator(compile(utils + r"""
+        int i = 10;
+        byte b = '\'';
+        int ia[i];
+        bool oa[i];
+        byte[] ba = [b, '\x42', b];
+        empty @is_you() {
+            i += 1;
+            write(i);
+            b -= 1;
+            write(b);
+            for (int i = 0; i < ia.length; i += 1) {
+                ia[i] = i;
+            }
+            write_arr(ia);
+            for (int i = 0; i < oa.length; i += 1) {
+                oa[i] = i % 2 == 0;
+            }
+            write_arr(oa);
+            write_arr(ba);
+        }
+    """))
+
+    assert run_to_flag(emulator, 'win') == (
+        b'11'
+        b"&"
+        b'[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]'
+        b'[true, false, true, false, true, false, true, false, true, false]'
+        b'[0x27, 0x42, 0x27]'
+    )
+
+def test_negative_vla_length():
+    emulator = make_emulator(compile("""
+        empty @is_you(int length) {
+            byte ba[length * 2];
+            writeln(ba.length);
+            int ia[length];
+            writeln(ia.length);
+        }
+    """), ['-32767'])  # -32767 * 2 == 2
+
+    assert run_to_flag(emulator, 'stack_overflow') == b'2\n'
+
+@pytest.mark.parametrize('length, index', [
+    (0, 0),
+    (10, 10),
+    (10, -1)
+])
+def test_bounds_check(length, index):
+    emulator = make_emulator(compile("""
+        empty @is_you(int length, int index) {
+            bool arr[length];
+            arr[index] = false;
+            writeln("No error");
+        }
+    """), [str(length), str(index)])
+
+    assert run_to_flag(emulator, 'out_of_bounds') == b''
+
+def test_division_by_zero():
+    assert run_to_flag(make_emulator(compile("""
+        empty @is_you(int a, int b) {
+            writeln(a / b);
+        }
+    """), ['1', '0']), 'division_by_zero') == b''
+
+    assert run_to_flag(make_emulator(compile("""
+        empty @is_you(int a, int b) {
+            writeln(a % b);
+        }
+    """), ['1', '0']), 'division_by_zero') == b''
+
+def test_nonlocal_preempt():
+    assert run_to_flag(make_emulator(compile("""
+        empty !baba() {
+            if (false) { preempt {} }
+        }
+
+        empty @is_you() {
+            try {
+                !baba();
+                !is_defeat();
+            } undo {}
+        }
+    """)), 'nonlocal_preempt') == b''
