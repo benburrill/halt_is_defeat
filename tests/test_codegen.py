@@ -110,13 +110,14 @@ def test_basic():
         b'tnt: j tnt',
         b'halt'
     ], ['3'])
+
     assert list(run_to_flag(emulator, 'win')) == [3, 2, 1, 0]
 
 def test_hello():
     emulator = make_emulator(compile("""
-    empty @is_you() {
-        writeln("Hello world!");
-    }
+        empty @is_you() {
+            writeln("Hello world!");
+        }
     """))
 
     assert run_to_flag(emulator, 'win') == b'Hello world!\n'
@@ -160,12 +161,12 @@ def test_command_line_args():
 
 def test_mixed_command_line():
     emulator = make_emulator(compile(utils + """
-        empty @is_you(string s, byte b, int[] i) {
+        empty @is_you(string s, int[] i, byte b) {
             write(s);
             writeln(b);
             write_arr(i);
         }
-    """), ['Hello', '33', '1', '2', '3', '4', '5'])
+    """), ['Hello', '1', '2', '3', '4', '5', '33'])
 
     assert run_to_flag(emulator, 'win') == (
         b'Hello!\n'
@@ -505,6 +506,23 @@ def test_deallocate_vla():
         b'Allocated and deallocated y\n'
     )
 
+
+def test_continue_deallocate_array():
+    emulator = make_emulator(compile("""
+        empty @is_you() {
+            for (int i = 0; i < 20; i += 1) {
+                int arr[11];
+                arr[0] = i;
+                writeln(arr[0]);
+            }
+        }
+    """, stack_size=20))
+
+    assert run_to_flag(emulator, 'win') == b''.join(
+        str(i).encode('utf-8') + b'\n'
+        for i in range(20)
+    )
+
 def test_push_byte_to_int():
     emulator = make_emulator(compile("""
         empty f(int i) {
@@ -550,3 +568,65 @@ def test_speculation():
         b'0\n42\n'
         b'42\n'
     )
+
+def test_uninitialized_bool():
+    # Some HiD code, such as the SAT solver assumes that uninitialized
+    # arrays of bools will consist of valid bool values.
+    # Although uninitialized array elements have unspecified value, I
+    # only consider it as undefined behavior to "do things" with these
+    # values in the case of string arrays.
+    # Here we test that not and == work correctly on uninitialized bools
+    #
+    # We will also assume that values are obtained from the bits of the
+    # previous array, though this is not strictly required behavior, so
+    # the test could be changed to simply check that there are no X's.
+    emulator = make_emulator(compile(utils + """
+        empty @is_you() {
+            {
+                byte[] x = [0xAA, 0xAA];
+                write_arr(x);
+            }
+            bool arr[10];
+            for (int i = 0; i < arr.length; i += 1) {
+                if (arr[i] == true) {
+                    bool n = not arr[i];
+                    if (n == false) {
+                        write('1');
+                    } else {
+                        write('X');
+                    }
+                } else if (arr[i] == false) {
+                    bool n = not arr[i];
+                    if (n == true) {
+                        write('0');
+                    } else {
+                        write('X');
+                    }
+                } else {
+                    write('X');
+                }
+            }
+        }
+    """))
+
+    assert run_to_flag(emulator, 'win') == b'[0xAA, 0xAA]' + b'01' * 5
+
+def test_bool_casts():
+    emulator = make_emulator(compile("""
+        empty @is_you() {
+            int i0 = 0;
+            int i1 = 42;
+            string s0 = "";
+            string s1 = "Hello";
+            int[] a0 = [];
+            int[] a1 = [0];
+            writeln(i0 is bool == false);
+            writeln(i1 is bool == true);
+            writeln(s0 is bool == false);
+            writeln(s1 is bool == true);
+            writeln(a0 is bool == false);
+            writeln(a1 is bool == true);
+        }
+    """))
+
+    assert run_to_flag(emulator, 'win') == b'true\n' * 6
