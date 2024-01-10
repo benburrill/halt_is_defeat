@@ -130,8 +130,10 @@ class EqualityOp(BooleanOp):
         ).simplify()
 
 
+@dc.dataclass(frozen=True)
 class ArithmeticOp(Operator):
     type = DataType.INT
+    shrinkable: bool = dc.field(kw_only=True, default=False)
 
     @abstractmethod
     def operate(self, *args):
@@ -141,44 +143,47 @@ class ArithmeticOp(Operator):
         if all(isinstance(arg, IntValue) for arg in self.args):
             return IntValue(
                 int(self.operate(*[arg.data for arg in self.args])),
-                self.span, all(arg.literal for arg in self.args)
+                self.span, self.shrinkable
             )
 
         return self
 
+    def coercible(self, new_type):
+        return (
+            super().coercible(new_type) or
+            self.shrinkable and new_type == DataType.BYTE
+        )
 
+
+@dc.dataclass(frozen=True)
 class BinaryArithmeticOp(Binary, ArithmeticOp):
     def evaluate(self, env):
         left = self.left.evaluate(env)
         right = self.right.evaluate(env)
-        result = type(self)(
+        return type(self)(
             self.op_span,
             left.coerce(DataType.INT),
-            right.coerce(DataType.INT)
+            right.coerce(DataType.INT),
+            # The result of an arithmetic operation has type int, but is
+            # coercible to byte if all of its operands are.
+            # In a (probably unnecessary) effort to permit repeated
+            # evaluation, we retain shrinkability if the operation has
+            # already been determined to be shrinkable.
+            shrinkable=self.shrinkable or (
+                left.coercible(DataType.BYTE) and
+                right.coercible(DataType.BYTE)
+            )
         ).simplify()
 
-        match (left, right):
-            case ((Expression(type=DataType.BYTE), IntValue(literal=True)) |
-                 (IntValue(literal=True), Expression(type=DataType.BYTE))):
-                # goofiness to preserve literal status
-                if result.coercible(DataType.BYTE):
-                     return result.coerce(DataType.BYTE)
-                return result.cast(DataType.BYTE)
-        return result
 
-
+@dc.dataclass(frozen=True)
 class UnaryArithmeticOp(Unary, ArithmeticOp):
     def evaluate(self, env):
         arg = self.arg.evaluate(env)
-        result = type(self)(
-            self.op_span, arg.coerce(DataType.INT)
+        return type(self)(
+            self.op_span, arg.coerce(DataType.INT),
+            shrinkable=self.shrinkable or arg.coercible(DataType.BYTE)
         ).simplify()
-
-        if arg.type == DataType.BYTE:
-            if result.coercible(DataType.BYTE):
-                return result.coerce(DataType.BYTE)
-            return result.cast(DataType.BYTE)
-        return result
 
 
 class Add(BinaryArithmeticOp):

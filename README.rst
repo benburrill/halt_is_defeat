@@ -168,11 +168,15 @@ Output:
         CPU time: 90 clock cycles
         Emulator efficiency: 42.06%
 
-The try block is skipped entirely!
+The try block is skipped entirely, saving us 85 clock cycles!
 
 Halting problems
 ----------------
-If we modify the above code by putting a loop before ``!is_defeat()``,
+One nice thing about try/undo is that like an if/else, try and undo are
+mutually exclusive.  Either the try block or the undo block will run,
+but never both.
+
+If we modify the previous code by putting a loop before ``!is_defeat()``,
 the code will test if the loop will terminate, since defeat would never
 occur if the loop runs forever:
 
@@ -558,6 +562,11 @@ Types and special coercion rules of literals:
    entries can be coerced to, but is coercible to any type all entries
    can be coerced to.  Preferentially ``const``, but may be coerced to
    non-const.
+
+Arithmetic operators (``+``, ``-``, ``*``, ``/``, ``%``) take operands
+of either ``byte`` or ``int`` and always produce values of type ``int``.
+However, if all of the operands are coercible to ``byte``, the resulting
+value is also coercible to ``byte``.
 
 Explicit type casts may be performed with ``is``, eg ``baba is byte``.
 

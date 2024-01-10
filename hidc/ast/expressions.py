@@ -311,36 +311,35 @@ class PrimitiveValue(Expression):
 class IntValue(PrimitiveValue):
     type = DataType.INT
     data: int
-    literal: bool = True
+    shrinkable: bool = True
     is_char: bool = dc.field(default=False, compare=False)
 
     def cast(self, new_type, *, implicit=False):
         if new_type == DataType.BOOL:
             return BoolValue(bool(self.data), self.span)
         elif new_type == DataType.BYTE:
-            # TODO: I feel that this should probably do self.data & 0xFF
-            #  but I'm not totally sure of the implications or if that
-            #  should be done elsewhere.
+            # TODO: we should probably do self.data & 0xFF
             #  Should have result that 4 / (258 is byte) produces 2, as
             #  it would if evaluated at runtime.
-            #  For that matter I should probably also track word size in
-            #  env and use it when evaluating IntValues to do a (signed)
-            #  wraparound.
-            return ByteValue(self.data, self.span, implicit and self.literal, self.is_char)
+            #  For that matter I should also track word size in env and
+            #  use for (signed) wraparound in arithmetic evaluation.
+            #  Also when we create IntValues to begin with...  and maybe
+            #  more places I forget.
+            return ByteValue(self.data, self.span, self.shrinkable, self.is_char)
         elif new_type == DataType.INT:
-            return IntValue(self.data, self.span, implicit and self.literal, self.is_char)
+            # Whenever a ByteValue is implicitly coerced to an IntValue,
+            # it should be shrinkable back to byte.
+            return IntValue(self.data, self.span, implicit, self.is_char)
         return super().cast(new_type)
 
     def coercible(self, new_type):
         return (
             super().coercible(new_type) or
-            self.literal and new_type in {
-                DataType.INT, DataType.BYTE
-            }
+            self.shrinkable and new_type == DataType.BYTE
         )
 
     def coerce(self, new_type):
-        # Should (2 is int) be coercible to byte?
+        # (1 + 1) should be coercible to byte, but should (2 is int) be?
         # I think not.  So I'm awkwardly adding this "implicit" argument
         # to retain literal status for implicit coersions only.
         # Regardless, (2 is byte) is coercible to int.
@@ -350,10 +349,10 @@ class IntValue(PrimitiveValue):
             return self.cast(new_type, implicit=True)
         return super().coerce(new_type)
 
-    # Substitution makes IntValues no longer be literal and instead act
-    # like normal ints in type coercion.
+    # Substitution makes IntValues no longer be shrinkable and instead
+    # act like normal ints in type coercion.
     def at(self, span):
-        return type(self)(self.data, span, literal=False, is_char=self.is_char)
+        return type(self)(self.data, span, shrinkable=False, is_char=self.is_char)
 
 
 class ByteValue(IntValue):

@@ -134,6 +134,8 @@ def test_coercion():
         empty f() {
             int x = 'a';
             byte y = 10;
+            byte z = 1 + 1;
+            byte w = -1;
         }
     """)
 
@@ -146,7 +148,7 @@ def test_coercion():
 
     assert_bad("""
         empty f() {
-            int x = 10;
+            const int x = 10;
             byte y = x;
         }
     """)
@@ -174,15 +176,73 @@ def test_coercion():
 
     assert_good("""
         empty f() {
+            const byte x = 10;
+            byte y = x;
+            y = y + 1;
+            byte z = x + 1;
+        }
+    """)
+
+    assert_good("""
+        empty f() {
+            byte b = 1;
             byte x = 0;
-            x += 1;
+            x += b;
+        }
+    """)
+
+    assert_bad("""
+        empty f() {
+            int i = 1;
+            byte x = 0;
+            x += i;
         }
     """)
 
     assert_good("""
         empty f() {
             byte x = 0;
-            byte y = x * 3 + 2;
+            x += 1;
+        }
+    """)
+
+    assert_bad("""
+        empty f() {
+            byte x = 0;
+            x += 1 is int;
+        }
+    """)
+
+    assert_good("""
+        empty f() {
+            byte x = 0;
+            x += 1 is byte;
+        }
+    """)
+
+    assert_good("""
+        empty f() {
+            byte x = 0;
+            x += (1 is int) is byte;
+        }
+    """)
+
+    assert_good("""
+        empty f(byte x) {
+            byte y = x * 3 + 4;
+            byte z = x * 3 + y * 5;
+        }
+    """)
+
+    assert_good("""
+        empty f(byte b, int i) {
+            int x = b * 2 + i * 3;
+        }
+    """)
+
+    assert_bad("""
+        empty f(byte b, int i) {
+            byte x = b * 2 + i * 3;
         }
     """)
 
