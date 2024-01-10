@@ -411,11 +411,6 @@ from the command line arguments.
 You can even mix and match:
 ``empty @is_you(string mode, const int[] args)``
 
-In addition to convenience, an advantage to this is that the cycle count
-reported by ``spasm`` won't get artificially inflated by parsing code,
-which is useful in evaluating the performance of your time-traveling
-algorithms.
-
 Caveats:
 
 - You may only have at most one array in the parameters of ``@is_you``.
@@ -601,6 +596,16 @@ provided.
 
 Ordinary functions (no prefix) cannot call either you functions or
 defeat functions, but may be called from anywhere.
+
+``try`` blocks must have either a ``stop`` or ``undo`` handler.  The
+``stop`` handler is run if defeat is reached in the try block (similar
+to catch or except in other languages).  The ``undo`` block is run
+instead of the ``try`` block if running the try block *would have* lead
+to defeat.
+
+Regardless of handler, ``try`` blocks can contain any number of
+``preempt`` blocks.  The ``preempt`` block is run if not running the
+``preempt`` block would lead to defeat in its parent ``try`` block.
 
 Summary of what's allowed in different blocks
 .............................................
