@@ -320,6 +320,24 @@ def test_int_array_inc_assign():
 
     assert run_to_flag(emulator, 'win') == b'[18, -15, 6]'
 
+def test_byte_array_inc_assign():
+    emulator = make_emulator(compile(utils + """
+        empty f(byte[] arr) {
+            arr[0] += 1;
+            arr[0] *= 3;
+            arr[0] += arr[0];
+            arr[1] -= arr[0];
+        }
+
+        empty @is_you() {
+            byte[] arr = [2, 3, 6];
+            f(arr);
+            write_arr(arr);
+        }
+    """))
+
+    assert run_to_flag(emulator, 'win') == b'[0x12, 0xF1, 0x06]'
+
 def test_bool_array_assign():
     emulator = make_emulator(compile(utils + """
         empty f(bool[] arr) {
@@ -646,6 +664,20 @@ def test_bool_casts():
     """))
 
     assert run_to_flag(emulator, 'win') == b'true\n' * 6
+
+def test_byte_casts():
+    emulator = make_emulator(compile("""
+        empty @is_you() {
+            bool b = true;
+            int i1 = 0x1142;
+            int i2 = 0xFF;
+            writeln(b is byte == 1);
+            writeln(i1 is byte == 0x42);
+            writeln(i2 is byte == 0xFF);
+        }
+    """))
+
+    assert run_to_flag(emulator, 'win') == b'true\n' * 3
 
 @pytest.mark.parametrize('n, expected', [
     (1, b'false'),
