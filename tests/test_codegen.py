@@ -460,6 +460,8 @@ def test_deallocate_local_array_literal_func_call():
             write_arr(x); // Just for convenience writing the assertion
         }
         empty @is_you() {
+            // We don't have to worry about compiler optimizing these to
+            // global arrays because f() takes non-const array. 
             f([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
             f([12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]);
             int[] x = [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33];
@@ -472,6 +474,16 @@ def test_deallocate_local_array_literal_func_call():
         b'[12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22][0, 0, 0]' * 2 +
         b'[23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33][0, 0, 0]' * 2
     )
+
+def test_array_index_array():
+    emulator = make_emulator(compile("""
+        empty @is_you(int x, int y) {
+            // We use arguments here to suppress compiler optimizations
+            write([x, 12, 47][[1, y, 2][1]]);
+        }
+    """), ['5', '0'])
+
+    assert run_to_flag(emulator, 'win') == b'5'
 
 def test_stack_overflow_vla():
     emulator = make_emulator(compile("""
@@ -506,17 +518,21 @@ def test_deallocate_vla():
         b'Allocated and deallocated y\n'
     )
 
-
-def test_continue_deallocate_array():
+@pytest.mark.parametrize('cont', [0, 1])
+def test_loop_deallocate_array(cont):
     emulator = make_emulator(compile("""
-        empty @is_you() {
+        empty @is_you(int cont) {
             for (int i = 0; i < 20; i += 1) {
                 int arr[11];
                 arr[0] = i;
                 writeln(arr[0]);
+                // Should work the same regardless of whether we
+                // continue early or not.
+                if (cont) { continue; }
+                write("");
             }
         }
-    """, stack_size=20))
+    """, stack_size=20), [cont])
 
     assert run_to_flag(emulator, 'win') == b''.join(
         str(i).encode('utf-8') + b'\n'
@@ -630,3 +646,38 @@ def test_bool_casts():
     """))
 
     assert run_to_flag(emulator, 'win') == b'true\n' * 6
+
+@pytest.mark.parametrize('n, expected', [
+    (1, b'false'),
+    (2, b'true'),
+    (437, b'false'),
+    (439, b'true')
+])
+def test_primality(n, expected):
+    # Simpler version of examples/factor.hid
+    emulator = make_emulator(compile("""
+        bool @prime(int n) {
+            if (n < 2) { return false; }
+            try {
+                int factor = 0;
+                int half = n / 2;
+                for (int b = 1; b <= half; b *= 2) {
+                    preempt { factor += b; }
+                    preempt { continue; }
+                    break;
+                }
+
+                !truth_is_defeat(factor <= 1);
+                !truth_is_defeat(n % factor != 0);
+                return false;
+            } undo {
+                return true;
+            }
+        }
+
+        empty @is_you(int n) {
+            write(@prime(n));
+        }
+    """), [str(n)])
+
+    assert run_to_flag(emulator, 'win') == expected
