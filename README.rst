@@ -29,11 +29,10 @@ Alternatively, you may install the ``hidc`` executable:
 
 The ``hidc`` compiler has a single backend, targeting the Sphinx
 instruction set architecture.  As of this writing, Sphinx processors are
-not yet commercially available, though you may build one yourself from
-scratch on a breadboard using flux capacitors and other off-the-shelf
-components.
+not yet commercially available due to global electronics shortages of
+some critical components, such as flux capacitors.
 
-However, the simplest way to run the generated Sphinx assembly code is
+The simplest way to run the generated Sphinx assembly code is
 under the Sphinx emulator, ``spasm``.  The ``spasm`` emulator is
 available for download from https://github.com/benburrill/sphinx
 
@@ -213,8 +212,8 @@ non-terminating any more so than try/stop does.
 As for *how* it works, to provide some comfort that it isn't flagrantly
 impossible, Sphinx (HiD's compilation target) is **not** strictly Turing
 complete (no computer with finite memory is TC), so Sphinx's halting
-problem is not undecidable.  We are not solving the halting problem of
-Turing machines, only of Sphinx.
+problem need not be undecidable.  The Sphinx emulator is not solving the
+halting problem of Turing machines, only of Sphinx.
 
 For more information on what's really going on here, see
 https://github.com/benburrill/sphinx.
@@ -447,14 +446,8 @@ Although increasing the word and stack size can increase the size of the
 problems you can solve with HiD, be wary of the exponential tendencies
 of emulation under ``spasm`` -- you may want to take things slow.
 There's no prize for writing a program that requires more RAM in order
-to emulate than could fit in the observable universe, it just means you
-need a better computer.
-
-If using 24 bit words, I'd recommend decreasing the stack size to 100
-words or less for testing, so that if you accidentally write a tight
-24-bit loop ``spasm`` won't need more than 8 GB if that loop needs to be
-predicted (assuming no non-const globals).  If using more than 24 bits,
-you are on your own, god help you.
+to emulate than could physically fit in the observable universe, it just
+means you need a better computer.
 
 Fatal errors and undefined behavior
 -----------------------------------
