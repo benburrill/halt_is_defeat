@@ -39,6 +39,9 @@ available for download from https://github.com/benburrill/sphinx
 Please note however that the ``spasm`` emulator is written in Python, so
 it should not be relied on for performance-critical applications.
 
+The following examples provide an introduction to Halt is Defeat,
+starting from the basics and building up to time travel.
+
 Hello world
 -----------
 The entry point to Halt is Defeat programs is ``@is_you()``.  The return
@@ -72,21 +75,21 @@ Running under ``spasm`` produces the expected output:
         CPU time: 578 clock cycles
         Emulator efficiency: 48.78%
 
-If you run it yourself, you may notice something a little odd.  Once the
-end of the program is reached, it gets stuck in an infinite loop.
+If you run it yourself, you may notice something strange.  Even after
+the end of the program is reached, ``spasm`` keeps running, apparently
+doing nothing.
 
-This behavior is necessary in order for Halt is Defeat to ensure that
-your programs are undefeatable.  Since "Halt is Defeat", the program
-must never halt, so upon returning from ``@is_you()``, Halt is Defeat
-code emits the "win" flag (as seen in the output from ``spasm``) and
-then loops forever.
+Indeed, after returning from ``@is_you()``, the "win" flag is emitted
+(as seen in the output from ``spasm``), and then the program enters into
+an infinite loop.
 
-If running under the ``spasm`` emulator, you can always issue a keyboard
-interrupt (ctrl-c) to forcibly stop the running program.  Attempting to
-stop programs running on a real Sphinx processor is not recommended and
-may destroy the universe.
+The loop is there to guard the past against future defeat, but don't
+worry about it.  If running under the ``spasm`` emulator, you can always
+issue a keyboard interrupt (ctrl-c) to forcibly stop the running
+program.  Attempting to stop programs running on a real Sphinx processor
+is not recommended and may destroy the universe.
 
-When the ``win`` flag is encountered, the ``spasm`` emulator displays
+When the "win" flag is encountered, the ``spasm`` emulator displays
 some statistics.  The CPU time is the number of Sphinx instructions
 executed (each instruction takes 1 clock cycle).  The emulator
 efficiency is an implementation detail of the emulator and may be
@@ -224,8 +227,9 @@ jump instruction", which performs a jump if not jumping would lead to
 halting.
 
 Another fun implementation detail is that because Sphinx has no other
-jump instructions, even ``if`` statements in Halt is Defeat must predict
-the future, and work by propagating future halts backwards through time.
+jump instructions, even ``if`` statements in Halt is Defeat are forced
+to predict the future, and work by propagating future halts backwards
+through time.
 We've been solving Sphinx's halting problem since Hello World!
 
 Computational astrology
@@ -472,16 +476,20 @@ Errors can also be produced in user code with ``all_is_broken()``.
 
 Although many operations in HiD are checked and will produce runtime
 errors, there is some undefined behavior in the case of dynamically
-allocated arrays.  Dynamically allocated arrays are uninitialized, and
-the use of uninitialized strings is undefined behavior.
+allocated arrays.
+
+Dynamically allocated arrays are uninitialized. Any use of uninitialized
+strings (ie obtained from an array of strings) is undefined behavior.
+The other scalar types (`int`, `byte`, and `bool`) are safe to use when
+uninitialized, but their initial value is otherwise unspecified.
 
 Additionally, if the ``--unchecked`` flag is passed, all previously
 checked operations become undefined behavior:
 
 - Division or modulo by 0
 - Indexing an array or string out of bounds
-- Stack overflow
 - Dynamically allocating an array with negative length
+- Stack overflow
 - Calling a preemptive defeat function without providing safety
 
 Be aware that HiD's nasal demons can time travel, so undefined behavior
